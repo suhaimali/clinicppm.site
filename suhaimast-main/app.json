@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "suhaimast",
+    "slug": "suhaimast",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "splash": {
+      "image": "./assets/play_store_512.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#000000"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#000000",
+      "barStyle": "light-content",
+      "translucent": false
+    },
+    "android": {
+      "backgroundColor": "#000000",
+      "package": "com.suhaimsoft.suhaimast"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0e30faf1-7012-415c-b2ee-e08bfc0094ec"
+      }
+    }
+  }
+}
