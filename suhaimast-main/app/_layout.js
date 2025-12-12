@@ -2,22 +2,23 @@ import { Entypo, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons }
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Dimensions, FlatList, Image, LayoutAnimation, Linking, Modal, Platform, SafeAreaView, ScrollView,
-  StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, UIManager, View
+  ActivityIndicator, Alert, Dimensions, FlatList, Image, LayoutAnimation, Linking, Modal, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, UIManager, View
 } from 'react-native';
+import ViewShot, { captureRef } from 'react-native-view-shot';
 
 // --- CONFIGURATION ---
 const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2;
 
 // Default Config
-const DOCTOR_PHONE = '9895353078';
-const DOCTOR_WHATSAPP_NO = '919895353078';
-const DOCTOR_NAME = 'Dr. Mansoor';
+const DOCTOR_PHONE = '8606344694'; 
+const DOCTOR_WHATSAPP_NO = '918606344694'; 
+const DOCTOR_NAME = 'Dr. Mansoor Ali V. P.';
 const CLINIC_ADDRESS = 'Pathappiriyam, Malappuram';
 const EMERGENCY_CONTACT = '112';
 const SUPPORT_EMAIL = 'support@clinicapp.com';
@@ -34,7 +35,8 @@ const Colors = {
   text: '#263238', subText: '#78909C', action: '#5C6BC0', danger: '#EF5350',
   success: '#66BB6A', warning: '#FFA726', whatsapp: '#25D366', dash1: '#26A69A',
   dash2: '#5C6BC0', dash3: '#FFA726', dash4: '#EC407A', dash5: '#6D4C41', dash6: '#6A1B9A',
-  tealCard: '#127A75', yellowAccent: '#FFC107'
+  tealCard: '#127A75', yellowAccent: '#FFC107',
+  avatarBlue: '#2196F3'
 };
 
 // --- SCREENS DEFINITION ---
@@ -71,6 +73,20 @@ const LoadingOverlay = ({ visible }) => (
     </View>
   </Modal>
 );
+
+// --- HELPER: AVATAR COMPONENT ---
+const Avatar = ({ name, image, size = 50 }) => {
+  if (image) {
+    return <Image source={{ uri: image }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  }
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: Colors.avatarBlue, justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ color: '#FFF', fontSize: size * 0.45, fontWeight: 'bold' }}>
+        {name && name.length > 0 ? name.charAt(0).toUpperCase() : '?'}
+      </Text>
+    </View>
+  );
+};
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState(Screens.LOGIN);
@@ -250,12 +266,57 @@ const Dashboard = ({ patients, appointments, inventory, templates, procedures, p
 
 const PatientList = ({ patients, navigate, onDelete, onEdit, onBook }) => {
   const [search, setSearch] = useState(''); const [bookModal, setBookModal] = useState(null); const [apptTime, setApptTime] = useState('09:00 AM'); const [apptReason, setApptReason] = useState(''); const [isFollowUp, setIsFollowUp] = useState(false); const filtered = patients.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-  return (<View style={styles.screenContainer}><Header title="Patients" onBack={() => navigate(Screens.DASHBOARD)} onAdd={() => navigate(Screens.ADD_PATIENT)} /><View style={styles.searchContainer}><Ionicons name="search" size={20} color={Colors.subText} /><TextInput style={styles.searchInput} placeholder="Search Patient..." value={search} onChangeText={setSearch} /></View><FlatList data={filtered} keyExtractor={i => i.id} contentContainerStyle={{ padding: 20 }} renderItem={({ item }) => (<View key={item.id} style={styles.card}><TouchableOpacity style={styles.row} onPress={() => navigate(Screens.PATIENT_DETAILS, item)}><Image source={{ uri: item.image || 'https://via.placeholder.com/50' }} style={styles.listAvatar} /><View style={{ flex: 1, marginLeft: 15 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.cardSub}>{item.gender}, {item.age} yrs</Text></View></TouchableOpacity><View style={styles.cardActions}><TouchableOpacity onPress={() => setBookModal(item)} style={styles.actionLabelBtn}><FontAwesome5 name="calendar-plus" size={14} color={Colors.primary} /><Text style={styles.actionLabelText}>Book</Text></TouchableOpacity><TouchableOpacity onPress={() => onEdit(item)} style={styles.iconBtn}><FontAwesome5 name="pen" size={14} color={Colors.action} /></TouchableOpacity><TouchableOpacity onPress={() => onDelete(item.id)} style={[styles.iconBtn, { marginLeft: 10 }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity></View></View>)} ListEmptyComponent={<View style={styles.emptyState}><Text style={styles.emptyText}>No patients found.</Text></View>} /><Modal visible={!!bookModal} transparent={true} animationType="slide"><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Book Appointment</Text><Text style={{ textAlign: 'center', color: Colors.primary, marginBottom: 15, fontWeight: 'bold' }}>{bookModal?.name}</Text><View style={styles.timeGrid}>{TIME_SLOTS.slice(0, 6).map(t => (<TouchableOpacity key={t} style={[styles.timeSlot, apptTime === t && styles.activeTimeSlot]} onPress={() => setApptTime(t)}><Text style={[styles.timeSlotText, apptTime === t && { color: '#FFF' }]}>{t}</Text></TouchableOpacity>))}</View><Input label="Reason" value={apptReason} onChange={setApptReason} /><TouchableOpacity style={[styles.row, { marginBottom: 20 }]} onPress={() => setIsFollowUp(!isFollowUp)}><FontAwesome5 name={isFollowUp ? "check-square" : "square"} size={20} color={Colors.primary} /><Text style={{ marginLeft: 10, color: Colors.text }}>Follow Up?</Text></TouchableOpacity><View style={styles.row}><TouchableOpacity style={[styles.btnPrimary, { flex: 1, backgroundColor: Colors.subText, marginRight: 10 }]} onPress={() => setBookModal(null)}><Text style={styles.btnText}>CANCEL</Text></TouchableOpacity><TouchableOpacity style={[styles.btnPrimary, { flex: 1 }]} onPress={() => { onBook(bookModal, apptTime, apptReason, isFollowUp ? 'Follow Up' : 'Consultation'); setBookModal(null); }}><Text style={styles.btnText}>CONFIRM</Text></TouchableOpacity></View></View></View></Modal></View>);
+  return (<View style={styles.screenContainer}><Header title="Patients" onBack={() => navigate(Screens.DASHBOARD)} onAdd={() => navigate(Screens.ADD_PATIENT)} /><View style={styles.searchContainer}><Ionicons name="search" size={20} color={Colors.subText} /><TextInput style={styles.searchInput} placeholder="Search Patient..." value={search} onChangeText={setSearch} /></View><FlatList data={filtered} keyExtractor={i => i.id} contentContainerStyle={{ padding: 20 }} renderItem={({ item }) => (<View key={item.id} style={styles.card}><TouchableOpacity style={styles.row} onPress={() => navigate(Screens.PATIENT_DETAILS, item)}><Avatar name={item.name} image={item.image} size={50} /><View style={{ flex: 1, marginLeft: 15 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.cardSub}>{item.gender}, {item.age} yrs</Text></View></TouchableOpacity><View style={styles.cardActions}><TouchableOpacity onPress={() => setBookModal(item)} style={styles.actionLabelBtn}><FontAwesome5 name="calendar-plus" size={14} color={Colors.primary} /><Text style={styles.actionLabelText}>Book</Text></TouchableOpacity><TouchableOpacity onPress={() => onEdit(item)} style={styles.iconBtn}><FontAwesome5 name="pen" size={14} color={Colors.action} /></TouchableOpacity><TouchableOpacity onPress={() => onDelete(item.id)} style={[styles.iconBtn, { marginLeft: 10 }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity></View></View>)} ListEmptyComponent={<View style={styles.emptyState}><Text style={styles.emptyText}>No patients found.</Text></View>} /><Modal visible={!!bookModal} transparent={true} animationType="slide"><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Book Appointment</Text><Text style={{ textAlign: 'center', color: Colors.primary, marginBottom: 15, fontWeight: 'bold' }}>{bookModal?.name}</Text><View style={styles.timeGrid}>{TIME_SLOTS.slice(0, 6).map(t => (<TouchableOpacity key={t} style={[styles.timeSlot, apptTime === t && styles.activeTimeSlot]} onPress={() => setApptTime(t)}><Text style={[styles.timeSlotText, apptTime === t && { color: '#FFF' }]}>{t}</Text></TouchableOpacity>))}</View><Input label="Reason" value={apptReason} onChange={setApptReason} /><TouchableOpacity style={[styles.row, { marginBottom: 20 }]} onPress={() => setIsFollowUp(!isFollowUp)}><FontAwesome5 name={isFollowUp ? "check-square" : "square"} size={20} color={Colors.primary} /><Text style={{ marginLeft: 10, color: Colors.text }}>Follow Up?</Text></TouchableOpacity><View style={styles.row}><TouchableOpacity style={[styles.btnPrimary, { flex: 1, backgroundColor: Colors.subText, marginRight: 10 }]} onPress={() => setBookModal(null)}><Text style={styles.btnText}>CANCEL</Text></TouchableOpacity><TouchableOpacity style={[styles.btnPrimary, { flex: 1 }]} onPress={() => { onBook(bookModal, apptTime, apptReason, isFollowUp ? 'Follow Up' : 'Consultation'); setBookModal(null); }}><Text style={styles.btnText}>CONFIRM</Text></TouchableOpacity></View></View></View></Modal></View>);
 };
 
-// --- UPDATED PATIENT DETAILS WITH NEW ID CARD ---
+// --- UPDATED PATIENT DETAILS WITH NEW ID CARD & AUTO DOWNLOAD ---
 const PatientDetails = ({ patient, labs, navigate }) => {
   if (!patient) return null;
+  
+  // Ref for capturing the ID card view
+  const viewShotRef = useRef();
+
+  // 1. AUTO DOWNLOAD FUNCTION (Save to Gallery)
+  // FIXED: Removed the automatic hook `usePermissions` that caused crashes.
+  // We request permissions only when the button is pressed.
+  const handleDownloadPng = async () => {
+    try {
+      // 2. Capture View
+      const uri = await captureRef(viewShotRef, {
+        format: "png",
+        quality: 1.0, // Best quality
+      });
+
+      // 3. Save to Gallery
+      await MediaLibrary.saveToLibraryAsync(uri);
+      
+      Alert.alert("Success", "ID Card has been downloaded to your Photos/Gallery!");
+
+    } catch (error) {
+       console.log(error);
+       // Check if error is related to permission
+       if (error.message.includes('permission')) {
+           Alert.alert("Permission Required", "Please allow app to save photos in your settings.");
+       } else {
+           Alert.alert("Error", "Could not save image. " + error.message);
+       }
+    }
+  };
+
+  // 2. Share Function (Optional if they want to send via WhatsApp)
+  const handleSharePng = async () => {
+    try {
+      const uri = await captureRef(viewShotRef, {
+        format: "png",
+        quality: 0.9,
+      });
+      await Sharing.shareAsync(uri, { dialogTitle: `Share ID: ${patient.name}` });
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Could not share image.");
+    }
+  };
+
   const IdRow = ({ l, v }) => (
     <View style={{flexDirection:'row', marginBottom:5}}>
       <Text style={{color:'#B2DFDB', fontWeight:'700', width:110, fontSize:13}}>{l}</Text>
@@ -263,37 +324,63 @@ const PatientDetails = ({ patient, labs, navigate }) => {
       <Text style={{color:'#FFF', fontWeight:'700', flex:1, fontSize:14}}>{v}</Text>
     </View>
   );
+
   return (
     <View style={styles.screenContainer}>
       <Header title="Patient Profile" onBack={() => navigate(Screens.PATIENT_LIST)} />
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-        {/* NEW ID CARD DESIGN MATCHING THE IMAGE */}
-        <View style={styles.idCardContainer}>
-           <View style={styles.idCardCurve} />
-           <Text style={styles.idCardTitle}>ID CARD</Text>
-           <View style={{flexDirection:'row', alignItems:'center', marginTop:10}}>
-             <View style={styles.idAvatarBox}>
-                <View style={styles.idAvatarCircle}>
-                   {patient.image ? <Image source={{ uri: patient.image }} style={styles.idAvatarImg} /> : <FontAwesome5 name="user-md" size={40} color="#000" />}
+        {/* NEW ID CARD DESIGN WRAPPED IN VIEWSHOT FOR PNG CAPTURE */}
+        
+        <ViewShot ref={viewShotRef} options={{ format: "png", quality: 1.0 }} style={{backgroundColor: Colors.bg}}>
+            <View style={styles.idCardContainer}>
+            <View style={styles.idCardCurve} />
+            <Text style={styles.idCardTitle}>ID CARD</Text>
+            <View style={{flexDirection:'row', alignItems:'center', marginTop:10}}>
+                <View style={styles.idAvatarBox}>
+                    <View style={styles.idAvatarCircle}>
+                    {patient.image ? (
+                        <Image source={{ uri: patient.image }} style={styles.idAvatarImg} />
+                    ) : (
+                        // LETTER AVATAR LOGIC INSIDE ID CARD
+                        <View style={{width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF'}}>
+                           <Text style={{fontSize: 40, fontWeight: 'bold', color: Colors.primaryDark}}>
+                               {patient.name ? patient.name.charAt(0).toUpperCase() : '?'}
+                           </Text>
+                        </View>
+                    )}
+                    </View>
                 </View>
-             </View>
-             <View style={{flex:1, marginLeft:15}}>
-                <IdRow l="PATIENT NAME" v={patient.name} />
-                <IdRow l="ID NO" v={patient.id} />
-                <IdRow l="AGE/GENDER" v={`${patient.age} Yrs / ${patient.gender}`} />
-                <IdRow l="PHONE" v={patient.phone} />
-             </View>
-           </View>
-           <View style={styles.idDivider} />
-           <View style={{alignItems:'center', marginVertical:10}}>
-              <Text style={{color:'#FFF', opacity:0.9, fontSize:12, letterSpacing:0.5}}>CONSULTANT DOCTOR:</Text>
-              <Text style={{color:'#FFF', fontSize:24, fontWeight:'bold', fontStyle:'italic', marginVertical:2}}>Dr. Mansoor Ali V. P.</Text>
-              <Text style={{color:Colors.yellowAccent, fontSize:18, fontWeight:'bold'}}>PATHAPPIRIYAM</Text>
-           </View>
-           <View style={styles.idFooterBtn}>
-              <Text style={{color:Colors.primaryDark, fontWeight:'900', fontSize:15}}>APPOINTMENT BOOKING: +91 8606344694</Text>
-           </View>
+                <View style={{flex:1, marginLeft:15}}>
+                    <IdRow l="PATIENT NAME" v={patient.name} />
+                    <IdRow l="ID NO" v={patient.id} />
+                    <IdRow l="AGE/GENDER" v={`${patient.age} Yrs / ${patient.gender}`} />
+                    <IdRow l="PHONE" v={patient.phone} />
+                </View>
+            </View>
+            <View style={styles.idDivider} />
+            <View style={{alignItems:'center', marginVertical:10}}>
+                <Text style={{color:'#FFF', opacity:0.9, fontSize:12, letterSpacing:0.5}}>CONSULTANT DOCTOR:</Text>
+                <Text style={{color:'#FFF', fontSize:24, fontWeight:'bold', fontStyle:'italic', marginVertical:2}}>{DOCTOR_NAME}</Text>
+                <Text style={{color:Colors.yellowAccent, fontSize:18, fontWeight:'bold'}}>PATHAPPIRIYAM</Text>
+            </View>
+            <View style={styles.idFooterBtn}>
+                <Text style={{color:Colors.primaryDark, fontWeight:'900', fontSize:15}}>APPOINTMENT BOOKING: +91 {DOCTOR_PHONE}</Text>
+            </View>
+            </View>
+        </ViewShot>
+           
+        {/* BUTTONS ROW OUTSIDE CAPTURE VIEW */}
+        <View style={styles.idActionRowOuter}>
+            <TouchableOpacity style={styles.idActionBtnOuter} onPress={handleDownloadPng}>
+                <FontAwesome5 name="download" size={14} color="#FFF" />
+                <Text style={styles.idActionText}>Download PNG</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.idActionBtnOuter} onPress={handleSharePng}>
+                <FontAwesome5 name="share-alt" size={14} color="#FFF" />
+                <Text style={styles.idActionText}>Share PNG</Text>
+            </TouchableOpacity>
         </View>
+           
         {/* END ID CARD */}
 
         <Text style={styles.sectionTitle}>Vitals</Text>
@@ -321,8 +408,37 @@ const PatientDetails = ({ patient, labs, navigate }) => {
 };
 
 const PatientForm = ({ initialData, onSave, onCancel }) => {
-  const [form, setForm] = useState(initialData || { name: '', age: '', gender: 'Male', phone: '', blood: '', image: null, vitals: { bp: '', hr: '', temp: '', spo2: '', weight: '' } }); const [bookAppt, setBookAppt] = useState(false); const [apptTime, setApptTime] = useState('09:00 AM'); const [apptReason, setApptReason] = useState(''); const [isFollowUp, setIsFollowUp] = useState(false); const [showTimeModal, setShowTimeModal] = useState(false); const pickImage = async () => { let r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.5, allowsEditing: true }); if (!r.canceled) setForm({ ...form, image: r.assets[0].uri }); };
-  return (<View style={styles.screenContainer}><Header title={initialData ? "Edit Patient" : "Add New Patient"} onBack={onCancel} /><ScrollView contentContainerStyle={{ padding: 20 }}><TouchableOpacity style={styles.uploadCircle} onPress={pickImage}>{form.image ? <Image source={{ uri: form.image }} style={{ width: '100%', height: '100%', borderRadius: 50 }} /> : <FontAwesome5 name="camera" size={24} color={Colors.primary} />}</TouchableOpacity><Input label="Full Name" value={form.name} onChange={t => setForm({ ...form, name: t })} /><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="Age" kbd="numeric" value={form.age} onChange={t => setForm({ ...form, age: t })} /><Input style={{ flex: 1 }} label="Blood Group" value={form.blood} onChange={t => setForm({ ...form, blood: t })} /></View><Input label="Phone" kbd="phone-pad" value={form.phone} onChange={t => setForm({ ...form, phone: t })} /><Text style={styles.sectionTitle}>Vital Signs</Text><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="SpO2 (%)" kbd="numeric" value={form.vitals.spo2} onChange={t => setForm({ ...form, vitals: { ...form.vitals, spo2: t } })} /><Input style={{ flex: 1 }} label="BP (mmHg)" value={form.vitals.bp} onChange={t => setForm({ ...form, vitals: { ...form.vitals, bp: t } })} /></View><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="Pulse (bpm)" kbd="numeric" value={form.vitals.hr} onChange={t => setForm({ ...form, vitals: { ...form.vitals, hr: t } })} /><Input style={{ flex: 1 }} label="Temperature (°F)" kbd="numeric" value={form.vitals.temp} onChange={t => setForm({ ...form, vitals: { ...form.vitals, temp: t } })} /></View><Input label="Weight (kg)" kbd="numeric" value={form.vitals.weight} onChange={t => setForm({ ...form, vitals: { ...form.vitals, weight: t } })} /><View style={styles.apptSection}><View style={styles.row}><Text style={styles.sectionTitleSmall}>Book Appointment?</Text><TouchableOpacity style={[styles.toggleBtn, { backgroundColor: bookAppt ? Colors.success : '#CCC' }]} onPress={() => setBookAppt(!bookAppt)}><FontAwesome5 name={bookAppt ? "check" : "times"} size={16} color="#FFF" /></TouchableOpacity></View>{bookAppt ? (<View style={{ marginTop: 10 }}><Text style={styles.label}>Select Time</Text><TouchableOpacity style={styles.pickerBtn} onPress={() => setShowTimeModal(true)}><Text style={styles.pickerText}>{apptTime}</Text><FontAwesome5 name="clock" size={16} color={Colors.primary} /></TouchableOpacity><Input label="Reason for Visit" value={apptReason} onChange={setApptReason} style={{ marginTop: 10 }} /><TouchableOpacity style={[styles.row, { marginTop: 10 }]} onPress={() => setIsFollowUp(!isFollowUp)}><MaterialCommunityIcons name={isFollowUp ? "checkbox-marked" : "checkbox-blank-outline"} size={24} color={Colors.primary} /><Text style={{ marginLeft: 10, color: Colors.text, fontWeight: '600' }}>Follow Up Appointment</Text></TouchableOpacity></View>) : null}</View><TouchableOpacity style={styles.btnPrimary} onPress={() => onSave(form, bookAppt ? { bookit: true, time: apptTime, type: isFollowUp ? 'Follow Up' : 'Consultation', reason: apptReason } : { bookit: false })}><Text style={styles.btnText}>SAVE RECORD</Text></TouchableOpacity></ScrollView><Modal visible={showTimeModal} transparent={true} animationType="fade"><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Select Appointment Time</Text><View style={styles.timeGrid}>{TIME_SLOTS.map(time => (<TouchableOpacity key={time} style={[styles.timeSlot, apptTime === time && styles.activeTimeSlot]} onPress={() => { setApptTime(time); setShowTimeModal(false); }}><Text style={[styles.timeSlotText, apptTime === time && { color: '#FFF' }]}>{time}</Text></TouchableOpacity>))}</View><TouchableOpacity style={styles.modalClose} onPress={() => setShowTimeModal(false)}><Text style={{ color: Colors.danger }}>Cancel</Text></TouchableOpacity></View></View></Modal></View>);
+  const [form, setForm] = useState(initialData || { name: '', age: '', gender: 'Male', phone: '', blood: '', image: null, vitals: { bp: '', hr: '', temp: '', spo2: '', weight: '' } }); const [bookAppt, setBookAppt] = useState(false); const [apptTime, setApptTime] = useState('09:00 AM'); const [apptReason, setApptReason] = useState(''); const [isFollowUp, setIsFollowUp] = useState(false); const [showTimeModal, setShowTimeModal] = useState(false); 
+  
+  // FIX: Safely access MediaTypeOptions or fallback to string 'Images'
+  const pickImage = async () => { 
+      let mediaType = ImagePicker.MediaTypeOptions ? ImagePicker.MediaTypeOptions.Images : 'Images'; // Safety check
+      
+      let r = await ImagePicker.launchImageLibraryAsync({ 
+          mediaTypes: mediaType, 
+          quality: 0.5, 
+          allowsEditing: true 
+      }); 
+      if (!r.canceled) setForm({ ...form, image: r.assets[0].uri }); 
+  };
+  
+  return (<View style={styles.screenContainer}><Header title={initialData ? "Edit Patient" : "Add New Patient"} onBack={onCancel} /><ScrollView contentContainerStyle={{ padding: 20 }}>
+    
+    {/* AVATAR UPLOAD LOGIC */}
+    <TouchableOpacity style={styles.uploadCircle} onPress={pickImage}>
+      {form.image ? (
+        <Image source={{ uri: form.image }} style={{ width: '100%', height: '100%', borderRadius: 50 }} />
+      ) : (
+        // IF NO IMAGE, CHECK IF NAME EXISTS TO SHOW LETTER
+        form.name && form.name.length > 0 ? (
+           <Text style={{fontSize: 40, fontWeight: 'bold', color: Colors.primary}}>{form.name.charAt(0).toUpperCase()}</Text>
+        ) : (
+           <FontAwesome5 name="camera" size={24} color={Colors.primary} />
+        )
+      )}
+    </TouchableOpacity>
+    
+    <Input label="Full Name" value={form.name} onChange={t => setForm({ ...form, name: t })} /><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="Age" kbd="numeric" value={form.age} onChange={t => setForm({ ...form, age: t })} /><Input style={{ flex: 1 }} label="Blood Group" value={form.blood} onChange={t => setForm({ ...form, blood: t })} /></View><Input label="Phone" kbd="phone-pad" value={form.phone} onChange={t => setForm({ ...form, phone: t })} /><Text style={styles.sectionTitle}>Vital Signs</Text><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="SpO2 (%)" kbd="numeric" value={form.vitals.spo2} onChange={t => setForm({ ...form, vitals: { ...form.vitals, spo2: t } })} /><Input style={{ flex: 1 }} label="BP (mmHg)" value={form.vitals.bp} onChange={t => setForm({ ...form, vitals: { ...form.vitals, bp: t } })} /></View><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="Pulse (bpm)" kbd="numeric" value={form.vitals.hr} onChange={t => setForm({ ...form, vitals: { ...form.vitals, hr: t } })} /><Input style={{ flex: 1 }} label="Temperature (°F)" kbd="numeric" value={form.vitals.temp} onChange={t => setForm({ ...form, vitals: { ...form.vitals, temp: t } })} /></View><Input label="Weight (kg)" kbd="numeric" value={form.vitals.weight} onChange={t => setForm({ ...form, vitals: { ...form.vitals, weight: t } })} /><View style={styles.apptSection}><View style={styles.row}><Text style={styles.sectionTitleSmall}>Book Appointment?</Text><TouchableOpacity style={[styles.toggleBtn, { backgroundColor: bookAppt ? Colors.success : '#CCC' }]} onPress={() => setBookAppt(!bookAppt)}><FontAwesome5 name={bookAppt ? "check" : "times"} size={16} color="#FFF" /></TouchableOpacity></View>{bookAppt ? (<View style={{ marginTop: 10 }}><Text style={styles.label}>Select Time</Text><TouchableOpacity style={styles.pickerBtn} onPress={() => setShowTimeModal(true)}><Text style={styles.pickerText}>{apptTime}</Text><FontAwesome5 name="clock" size={16} color={Colors.primary} /></TouchableOpacity><Input label="Reason for Visit" value={apptReason} onChange={setApptReason} style={{ marginTop: 10 }} /><TouchableOpacity style={[styles.row, { marginTop: 10 }]} onPress={() => setIsFollowUp(!isFollowUp)}><MaterialCommunityIcons name={isFollowUp ? "checkbox-marked" : "checkbox-blank-outline"} size={24} color={Colors.primary} /><Text style={{ marginLeft: 10, color: Colors.text, fontWeight: '600' }}>Follow Up Appointment</Text></TouchableOpacity></View>) : null}</View><TouchableOpacity style={styles.btnPrimary} onPress={() => onSave(form, bookAppt ? { bookit: true, time: apptTime, type: isFollowUp ? 'Follow Up' : 'Consultation', reason: apptReason } : { bookit: false })}><Text style={styles.btnText}>SAVE RECORD</Text></TouchableOpacity></ScrollView><Modal visible={showTimeModal} transparent={true} animationType="fade"><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Select Appointment Time</Text><View style={styles.timeGrid}>{TIME_SLOTS.map(time => (<TouchableOpacity key={time} style={[styles.timeSlot, apptTime === time && styles.activeTimeSlot]} onPress={() => { setApptTime(time); setShowTimeModal(false); }}><Text style={[styles.timeSlotText, apptTime === time && { color: '#FFF' }]}>{time}</Text></TouchableOpacity>))}</View><TouchableOpacity style={styles.modalClose} onPress={() => setShowTimeModal(false)}><Text style={{ color: Colors.danger }}>Cancel</Text></TouchableOpacity></View></View></Modal></View>);
 };
 
 const LabList = ({ labs, navigate, onDelete, onEdit }) => {
@@ -331,7 +447,16 @@ const LabList = ({ labs, navigate, onDelete, onEdit }) => {
 };
 
 const LabForm = ({ initialData, patients, onSave, onCancel }) => {
-  const [form, setForm] = useState(initialData || { patientId: patients[0]?.id, testName: '', date: new Date().toLocaleDateString(), image: null, labNote: '' }); const pickProof = async () => { let r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 }); if (!r.canceled) setForm({ ...form, image: r.assets[0].uri }); };
+  const [form, setForm] = useState(initialData || { patientId: patients[0]?.id, testName: '', date: new Date().toLocaleDateString(), image: null, labNote: '' }); 
+  // FIX: Updated MediaTypeOptions with safety check
+  const pickProof = async () => { 
+      let mediaType = ImagePicker.MediaTypeOptions ? ImagePicker.MediaTypeOptions.Images : 'Images'; 
+      let r = await ImagePicker.launchImageLibraryAsync({ 
+          mediaTypes: mediaType, 
+          quality: 0.8 
+      }); 
+      if (!r.canceled) setForm({ ...form, image: r.assets[0].uri }); 
+  };
   return (<View style={styles.screenContainer}><Header title={initialData ? "Edit Report" : "Upload Report"} onBack={onCancel} /><ScrollView contentContainerStyle={{ padding: 20 }}><Text style={styles.label}>Select Patient</Text><View style={styles.inputBox}><Picker selectedValue={form.patientId} onValueChange={v => setForm({ ...form, patientId: v })}>{patients.map(p => <Picker.Item key={p.id} label={p.name} value={p.id} />)}</Picker></View><Input label="Test Name" placeholder="e.g. Blood Test, USG KUB" value={form.testName} onChange={t => setForm({ ...form, testName: t })} /><Input label="Lab Note / Result Detail" placeholder="e.g. 220 mg/dL" value={form.labNote} onChange={t => setForm({ ...form, labNote: t })} /><Text style={styles.label}>Upload Proof (Image)</Text><TouchableOpacity style={styles.imagePicker} onPress={pickProof}>{form.image ? <Image source={{ uri: form.image }} style={{ width: '100%', height: '100%', borderRadius: 10 }} /> : <View style={{ alignItems: 'center' }}><FontAwesome5 name="cloud-upload-alt" size={30} color={Colors.subText} /><Text style={{ color: Colors.subText, marginTop: 5 }}>Click to Upload</Text></View>}</TouchableOpacity><TouchableOpacity style={styles.btnPrimary} onPress={() => onSave(form)}><Text style={styles.btnText}>SAVE REPORT</Text></TouchableOpacity></ScrollView></View>);
 };
 
@@ -521,150 +646,932 @@ const Input = ({ label, value, onChange, style, kbd, placeholder, multiline }) =
 const DrawerItem = ({ icon, label, color, onPress }) => (<TouchableOpacity style={styles.drawerItem} onPress={onPress}><FontAwesome5 name={icon} size={20} color={color} style={{ width: 40 }} /><Text style={[styles.drawerLabel, { color }]}>{label}</Text></TouchableOpacity>);
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  screenContainer: { flex: 1, backgroundColor: Colors.bg },
-  header: { height: 80, backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 15, paddingHorizontal: 20, borderBottomLeftRadius: 25, borderBottomRightRadius: 25, elevation: 10 },
-  headerTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold', flex: 1, textAlign: 'center' },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginTop: 15, marginBottom: 10 },
-  loaderOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  loaderBox: { backgroundColor: '#FFF', padding: 25, borderRadius: 15, alignItems: 'center', elevation: 10 },
-  loaderText: { marginTop: 10, color: Colors.text, fontWeight: 'bold' },
-  welcomeBanner: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.primaryDark, padding: 20, borderRadius: 20, marginBottom: 20 },
-  welcomeText: { color: '#FFF', fontSize: 14, opacity: 0.8 },
-  docName: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gridCard: { width: CARD_WIDTH, backgroundColor: '#FFF', borderRadius: 20, padding: 20, marginBottom: 15, alignItems: 'center', elevation: 4 },
-  iconCircle: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  gridCount: { fontSize: 24, fontWeight: 'bold', color: Colors.text },
-  gridTitle: { fontSize: 14, color: Colors.subText },
-  apptCard: { flexDirection: 'row', backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 10, alignItems: 'center', elevation: 2 },
-  timeBox: { backgroundColor: '#E0F2F1', padding: 8, borderRadius: 8 },
-  timeText: { color: Colors.primary, fontWeight: 'bold' },
-  apptName: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
-  apptType: { fontSize: 12, color: Colors.subText },
-  apptSection: { backgroundColor: '#E0F7FA', padding: 15, borderRadius: 10, marginBottom: 20, borderLeftWidth: 5, borderLeftColor: Colors.primary },
-  sectionTitleSmall: { fontSize: 16, fontWeight: 'bold', color: Colors.primaryDark, flex: 1 },
-  toggleBtn: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
-  pickerBtn: { flexDirection: 'row', backgroundColor: '#FFF', padding: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#B2DFDB' },
-  pickerText: { fontSize: 16, fontWeight: 'bold', color: Colors.primary },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: '#FFF', borderRadius: 20, padding: 20 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
-  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  timeSlot: { padding: 10, margin: 5, borderRadius: 8, borderWidth: 1, borderColor: '#EEE', backgroundColor: '#FAFAFA' },
-  activeTimeSlot: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  timeSlotText: { color: Colors.text },
-  modalClose: { marginTop: 15, alignItems: 'center', padding: 10 },
-  card: { backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 12, elevation: 3 },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  cardTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
-  cardSub: { fontSize: 13, color: Colors.subText },
-  listAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#EEE' },
-  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10, borderTopWidth: 1, borderTopColor: '#EEE', paddingTop: 10, alignItems: 'center' },
-  actionLabelBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E0F2F1', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 5, marginRight: 10 },
-  actionLabelText: { color: Colors.primary, fontSize: 12, fontWeight: 'bold', marginLeft: 5 },
-  iconBtn: { padding: 8, backgroundColor: '#F5F7FA', borderRadius: 8 },
-  searchContainer: { flexDirection: 'row', backgroundColor: '#FFF', margin: 20, marginBottom: 10, borderRadius: 10, padding: 10, alignItems: 'center', elevation: 2 },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 16 },
+  // --- LAYOUT & BASICS ---
+  container: { 
+    flex: 1, 
+    backgroundColor: Colors.bg 
+  },
+  screenContainer: { 
+    flex: 1, 
+    backgroundColor: Colors.bg 
+  },
   
-  // --- NEW ID CARD STYLES ---
-  idCardContainer: { backgroundColor: Colors.tealCard, borderRadius: 15, padding: 20, marginBottom: 20, elevation: 6, position: 'relative', overflow: 'hidden' },
-  idCardCurve: { position: 'absolute', top: -50, left: -50, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(255,255,255,0.1)' },
-  idCardTitle: { textAlign: 'center', color: '#FFF', fontSize: 20, fontWeight: 'bold', letterSpacing: 3, marginBottom: 15 },
-  idAvatarBox: { alignItems: 'center', justifyContent: 'center' },
-  idAvatarCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  idAvatarImg: { width: 90, height: 90 },
-  idDivider: { height: 3, backgroundColor: Colors.yellowAccent, width: '100%', marginVertical: 15 },
-  idFooterBtn: { backgroundColor: '#FFF', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
-  // --------------------------
+  // --- HEADER ---
+  header: { 
+    height: 80, 
+    backgroundColor: Colors.primary, 
+    flexDirection: 'row', 
+    alignItems: 'flex-end', 
+    paddingBottom: 15, 
+    paddingHorizontal: 20, 
+    borderBottomLeftRadius: 25, 
+    borderBottomRightRadius: 25, 
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  headerTitle: { 
+    color: '#FFF', 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    flex: 1, 
+    textAlign: 'center' 
+  },
+  sectionTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: Colors.text, 
+    marginTop: 15, 
+    marginBottom: 10 
+  },
+  
+  // --- LOADER ---
+  loaderOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  loaderBox: { 
+    backgroundColor: '#FFF', 
+    padding: 25, 
+    borderRadius: 15, 
+    alignItems: 'center', 
+    elevation: 10 
+  },
+  loaderText: { 
+    marginTop: 10, 
+    color: Colors.text, 
+    fontWeight: 'bold' 
+  },
+  
+  // --- DASHBOARD ---
+  welcomeBanner: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    backgroundColor: Colors.primaryDark, 
+    padding: 20, 
+    borderRadius: 20, 
+    marginBottom: 20,
+    elevation: 5
+  },
+  welcomeText: { 
+    color: '#FFF', 
+    fontSize: 14, 
+    opacity: 0.8 
+  },
+  docName: { 
+    color: '#FFF', 
+    fontSize: 22, 
+    fontWeight: 'bold' 
+  },
+  gridContainer: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'space-between' 
+  },
+  gridCard: { 
+    width: CARD_WIDTH, 
+    backgroundColor: '#FFF', 
+    borderRadius: 20, 
+    padding: 20, 
+    marginBottom: 15, 
+    alignItems: 'center', 
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.23,
+    shadowRadius: 2.62,
+  },
+  iconCircle: { 
+    width: 50, 
+    height: 50, 
+    borderRadius: 25, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 10 
+  },
+  gridCount: { 
+    fontSize: 24, 
+    fontWeight: 'bold', 
+    color: Colors.text 
+  },
+  gridTitle: { 
+    fontSize: 14, 
+    color: Colors.subText 
+  },
+  
+  // --- APPOINTMENTS ---
+  apptCard: { 
+    flexDirection: 'row', 
+    backgroundColor: '#FFF', 
+    padding: 15, 
+    borderRadius: 15, 
+    marginBottom: 10, 
+    alignItems: 'center', 
+    elevation: 2 
+  },
+  timeBox: { 
+    backgroundColor: '#E0F2F1', 
+    padding: 8, 
+    borderRadius: 8 
+  },
+  timeText: { 
+    color: Colors.primary, 
+    fontWeight: 'bold' 
+  },
+  apptName: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: Colors.text 
+  },
+  apptType: { 
+    fontSize: 12, 
+    color: Colors.subText 
+  },
+  apptSection: { 
+    backgroundColor: '#E0F7FA', 
+    padding: 15, 
+    borderRadius: 10, 
+    marginBottom: 20, 
+    borderLeftWidth: 5, 
+    borderLeftColor: Colors.primary 
+  },
+  sectionTitleSmall: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: Colors.primaryDark, 
+    flex: 1 
+  },
+  
+  // --- FORMS & INPUTS ---
+  toggleBtn: { 
+    width: 30, 
+    height: 30, 
+    borderRadius: 15, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  pickerBtn: { 
+    flexDirection: 'row', 
+    backgroundColor: '#FFF', 
+    padding: 12, 
+    borderRadius: 8, 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    borderWidth: 1, 
+    borderColor: '#B2DFDB' 
+  },
+  pickerText: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: Colors.primary 
+  },
+  label: { 
+    fontSize: 12, 
+    fontWeight: 'bold', 
+    color: Colors.subText, 
+    marginBottom: 5, 
+    marginTop: 5 
+  },
+  inputBox: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 10, 
+    padding: Platform.OS === 'ios' ? 15 : 12, 
+    fontSize: 16, 
+    borderWidth: 1, 
+    borderColor: '#CFD8DC' 
+  },
+  btnPrimary: { 
+    backgroundColor: Colors.primary, 
+    padding: 18, 
+    borderRadius: 15, 
+    alignItems: 'center', 
+    marginTop: 10, 
+    elevation: 5 
+  },
+  btnText: { 
+    color: '#FFF', 
+    fontWeight: 'bold', 
+    fontSize: 16 
+  },
+  pickerContainer: { 
+    borderWidth: 1, 
+    borderColor: '#CFD8DC', 
+    borderRadius: 10, 
+    backgroundColor: '#FFF', 
+    overflow: 'hidden', 
+    justifyContent: 'center' 
+  },
+  pickerBtnSmall: { 
+    flexDirection: 'row', 
+    backgroundColor: '#FFF', 
+    padding: 8, 
+    borderRadius: 8, 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    borderWidth: 1, 
+    borderColor: '#B2DFDB' 
+  },
+  pickerTextSmall: { 
+    fontSize: 14, 
+    fontWeight: 'bold', 
+    color: Colors.primary 
+  },
+  
+  // --- MODALS ---
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  modalContent: { 
+    width: '85%', 
+    backgroundColor: '#FFF', 
+    borderRadius: 20, 
+    padding: 20 
+  },
+  modalTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    marginBottom: 15, 
+    textAlign: 'center' 
+  },
+  timeGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'center' 
+  },
+  timeSlot: { 
+    padding: 10, 
+    margin: 5, 
+    borderRadius: 8, 
+    borderWidth: 1, 
+    borderColor: '#EEE', 
+    backgroundColor: '#FAFAFA' 
+  },
+  activeTimeSlot: { 
+    backgroundColor: Colors.primary, 
+    borderColor: Colors.primary 
+  },
+  timeSlotText: { 
+    color: Colors.text 
+  },
+  modalClose: { 
+    marginTop: 15, 
+    alignItems: 'center', 
+    padding: 10 
+  },
+  
+  // --- LISTS & CARDS ---
+  card: { 
+    backgroundColor: '#FFF', 
+    padding: 15, 
+    borderRadius: 15, 
+    marginBottom: 12, 
+    elevation: 3 
+  },
+  row: { 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
+  cardTitle: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: Colors.text 
+  },
+  cardSub: { 
+    fontSize: 13, 
+    color: Colors.subText 
+  },
+  listAvatar: { 
+    width: 50, 
+    height: 50, 
+    borderRadius: 25, 
+    backgroundColor: '#EEE' 
+  },
+  cardActions: { 
+    flexDirection: 'row', 
+    justifyContent: 'flex-end', 
+    marginTop: 10, 
+    borderTopWidth: 1, 
+    borderTopColor: '#EEE', 
+    paddingTop: 10, 
+    alignItems: 'center' 
+  },
+  actionLabelBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#E0F2F1', 
+    paddingVertical: 5, 
+    paddingHorizontal: 10, 
+    borderRadius: 5, 
+    marginRight: 10 
+  },
+  actionLabelText: { 
+    color: Colors.primary, 
+    fontSize: 12, 
+    fontWeight: 'bold', 
+    marginLeft: 5 
+  },
+  iconBtn: { 
+    padding: 8, 
+    backgroundColor: '#F5F7FA', 
+    borderRadius: 8 
+  },
+  searchContainer: { 
+    flexDirection: 'row', 
+    backgroundColor: '#FFF', 
+    margin: 20, 
+    marginBottom: 10, 
+    borderRadius: 10, 
+    padding: 10, 
+    alignItems: 'center', 
+    elevation: 2 
+  },
+  searchInput: { 
+    flex: 1, 
+    marginLeft: 10, 
+    fontSize: 16 
+  },
+  emptyState: { 
+    alignItems: 'center', 
+    padding: 40, 
+    backgroundColor: Colors.card, 
+    borderRadius: 15, 
+    marginTop: 20 
+  },
+  emptyText: { 
+    color: Colors.subText, 
+    marginTop: 15, 
+    fontSize: 16, 
+    fontStyle: 'italic', 
+    textAlign: 'center' 
+  },
+  
+  // --- ID CARD STYLES (TEAL) ---
+  idCardContainer: { 
+    backgroundColor: Colors.tealCard, 
+    borderRadius: 15, 
+    padding: 20, 
+    marginBottom: 20, 
+    elevation: 6, 
+    position: 'relative', 
+    overflow: 'hidden' 
+  },
+  idCardCurve: { 
+    position: 'absolute', 
+    top: -50, 
+    left: -50, 
+    width: 150, 
+    height: 150, 
+    borderRadius: 75, 
+    backgroundColor: 'rgba(255,255,255,0.1)' 
+  },
+  idCardTitle: { 
+    textAlign: 'center', 
+    color: '#FFF', 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    letterSpacing: 3, 
+    marginBottom: 15 
+  },
+  idAvatarBox: { 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  idAvatarCircle: { 
+    width: 90, 
+    height: 90, 
+    borderRadius: 45, 
+    backgroundColor: '#FFF', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    overflow: 'hidden' 
+  },
+  idAvatarImg: { 
+    width: 90, 
+    height: 90 
+  },
+  idDivider: { 
+    height: 3, 
+    backgroundColor: Colors.yellowAccent, 
+    width: '100%', 
+    marginVertical: 15 
+  },
+  idFooterBtn: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 10, 
+    paddingVertical: 12, 
+    alignItems: 'center', 
+    marginTop: 10 
+  },
+  
+  // --- ID CARD BUTTONS (OUTSIDE CAPTURE VIEW) ---
+  idActionRowOuter: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginBottom: 10 
+  },
+  idActionBtnOuter: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: 10, 
+    paddingHorizontal: 15, 
+    borderRadius: 10, 
+    backgroundColor: Colors.primary, 
+    flex: 0.48, 
+    justifyContent: 'center' 
+  },
+  idActionText: { 
+    color: '#FFF', 
+    fontWeight: 'bold', 
+    marginLeft: 8, 
+    fontSize: 13 
+  },
 
-  vitalGrid: { flexDirection: 'row', justifyContent: 'space-between' },
-  vitalCard: { width: '30%', backgroundColor: '#FFF', padding: 10, borderRadius: 12, alignItems: 'center', borderTopWidth: 4, elevation: 3, justifyContent: 'space-between' },
-  vitalVal: { fontSize: 18, fontWeight: 'bold', marginTop: 5 },
-  vitalLabel: { fontSize: 12, color: Colors.subText },
-  uploadCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#E0F2F1', alignSelf: 'center', justifyContent: 'center', alignItems: 'center', marginBottom: 20, overflow: 'hidden' },
-  label: { fontSize: 12, fontWeight: 'bold', color: Colors.subText, marginBottom: 5, marginTop: 5 },
-  inputBox: { backgroundColor: '#FFF', borderRadius: 10, padding: Platform.OS === 'ios' ? 15 : 12, fontSize: 16, borderWidth: 1, borderColor: '#CFD8DC' },
-  btnPrimary: { backgroundColor: Colors.primary, padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10, elevation: 5 },
-  btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-  labThumb: { width: 50, height: 50, borderRadius: 10, backgroundColor: '#E0F2F1', justifyContent: 'center', alignItems: 'center' },
-  imagePicker: { height: 150, backgroundColor: '#F5F7FA', borderRadius: 15, borderStyle: 'dashed', borderWidth: 2, borderColor: '#CFD8DC', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  inputBoxRx: { backgroundColor: '#FFF', borderRadius: 10, padding: 12, fontSize: 16, borderWidth: 1, borderColor: '#CFD8DC', flexDirection: 'row', alignItems: 'center' },
-  rxTable: { backgroundColor: Colors.card, borderRadius: 15, elevation: 2, overflow: 'hidden' },
-  rxTableHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, backgroundColor: Colors.bg, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  rxHeaderCol: { flex: 1, fontWeight: 'bold', color: Colors.text },
-  rxTableItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, borderBottomWidth: 1, borderBottomColor: '#EEE', alignItems: 'center' },
-  rxTableCol: { flex: 1, paddingRight: 10 },
-  rxDate: { fontSize: 12, color: Colors.subText },
-  rxDiagnosis: { fontSize: 15, fontWeight: '600', color: Colors.text, marginTop: 2 },
-  emptyState: { alignItems: 'center', padding: 40, backgroundColor: Colors.card, borderRadius: 15, marginTop: 20 },
-  emptyText: { color: Colors.subText, marginTop: 15, fontSize: 16, fontStyle: 'italic', textAlign: 'center' },
-  pickerBtnSmall: { flexDirection: 'row', backgroundColor: '#FFF', padding: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#B2DFDB' },
-  pickerTextSmall: { fontSize: 14, fontWeight: 'bold', color: Colors.primary },
-  medCard: { flexDirection: 'row', backgroundColor: '#F5F7FA', padding: 10, borderRadius: 10, marginBottom: 8, alignItems: 'center', borderLeftWidth: 4, borderLeftColor: Colors.primary },
-  medName: { fontWeight: 'bold', color: Colors.text },
-  medDetails: { fontSize: 12, color: Colors.subText, fontStyle: 'italic' },
-  medInstructions: { fontSize: 12, color: Colors.action, marginTop: 5 },
-  detailText: { padding: 10, backgroundColor: Colors.bg, borderRadius: 8, marginBottom: 10, color: Colors.text },
-  medDetailItem: { borderBottomWidth: 1, borderBottomColor: '#EEE', paddingVertical: 10, marginBottom: 5 },
-  medNameDetail: { fontWeight: 'bold', color: Colors.primaryDark, fontSize: 15 },
-  medDetailsDetail: { fontSize: 12, color: Colors.subText, marginTop: 2 },
-  medInstructionsDetail: { fontSize: 13, color: Colors.text, marginTop: 5 },
-  drawerOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100, flexDirection: 'row' },
-  drawer: { width: width * 0.75, backgroundColor: '#FFF', height: '100%' },
-  drawerHeader: { justifyContent: 'flex-end', padding: 20, backgroundColor: Colors.bg },
+  // --- VITALS ---
+  vitalGrid: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between' 
+  },
+  vitalCard: { 
+    width: '30%', 
+    backgroundColor: '#FFF', 
+    padding: 10, 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    borderTopWidth: 4, 
+    elevation: 3, 
+    justifyContent: 'space-between' 
+  },
+  vitalVal: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    marginTop: 5 
+  },
+  vitalLabel: { 
+    fontSize: 12, 
+    color: Colors.subText 
+  },
+  
+  // --- UPLOADS & IMAGES ---
+  uploadCircle: { 
+    width: 100, 
+    height: 100, 
+    borderRadius: 50, 
+    backgroundColor: '#E0F2F1', 
+    alignSelf: 'center', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 20, 
+    overflow: 'hidden' 
+  },
+  labThumb: { 
+    width: 50, 
+    height: 50, 
+    borderRadius: 10, 
+    backgroundColor: '#E0F2F1', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  imagePicker: { 
+    height: 150, 
+    backgroundColor: '#F5F7FA', 
+    borderRadius: 15, 
+    borderStyle: 'dashed', 
+    borderWidth: 2, 
+    borderColor: '#CFD8DC', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 20 
+  },
+  
+  // --- PRESCRIPTION & TABLES ---
+  inputBoxRx: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 10, 
+    padding: 12, 
+    fontSize: 16, 
+    borderWidth: 1, 
+    borderColor: '#CFD8DC', 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
+  rxTable: { 
+    backgroundColor: Colors.card, 
+    borderRadius: 15, 
+    elevation: 2, 
+    overflow: 'hidden' 
+  },
+  rxTableHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    padding: 15, 
+    backgroundColor: Colors.bg, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#EEE' 
+  },
+  rxHeaderCol: { 
+    flex: 1, 
+    fontWeight: 'bold', 
+    color: Colors.text 
+  },
+  rxTableItem: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    padding: 15, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#EEE', 
+    alignItems: 'center' 
+  },
+  rxTableCol: { 
+    flex: 1, 
+    paddingRight: 10 
+  },
+  rxDate: { 
+    fontSize: 12, 
+    color: Colors.subText 
+  },
+  rxDiagnosis: { 
+    fontSize: 15, 
+    fontWeight: '600', 
+    color: Colors.text, 
+    marginTop: 2 
+  },
+  medCard: { 
+    flexDirection: 'row', 
+    backgroundColor: '#F5F7FA', 
+    padding: 10, 
+    borderRadius: 10, 
+    marginBottom: 8, 
+    alignItems: 'center', 
+    borderLeftWidth: 4, 
+    borderLeftColor: Colors.primary 
+  },
+  medName: { 
+    fontWeight: 'bold', 
+    color: Colors.text 
+  },
+  medDetails: { 
+    fontSize: 12, 
+    color: Colors.subText, 
+    fontStyle: 'italic' 
+  },
+  medInstructions: { 
+    fontSize: 12, 
+    color: Colors.action, 
+    marginTop: 5 
+  },
+  detailText: { 
+    padding: 10, 
+    backgroundColor: Colors.bg, 
+    borderRadius: 8, 
+    marginBottom: 10, 
+    color: Colors.text 
+  },
+  medDetailItem: { 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#EEE', 
+    paddingVertical: 10, 
+    marginBottom: 5 
+  },
+  medNameDetail: { 
+    fontWeight: 'bold', 
+    color: Colors.primaryDark, 
+    fontSize: 15 
+  },
+  medDetailsDetail: { 
+    fontSize: 12, 
+    color: Colors.subText, 
+    marginTop: 2 
+  },
+  medInstructionsDetail: { 
+    fontSize: 13, 
+    color: Colors.text, 
+    marginTop: 5 
+  },
+  
+  // --- DRAWER ---
+  drawerOverlay: { 
+    position: 'absolute', 
+    top: 0, 
+    bottom: 0, 
+    left: 0, 
+    right: 0, 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    zIndex: 100, 
+    flexDirection: 'row' 
+  },
+  drawer: { 
+    width: width * 0.75, 
+    backgroundColor: '#FFF', 
+    height: '100%' 
+  },
+  drawerHeader: { 
+    justifyContent: 'flex-end', 
+    padding: 20, 
+    backgroundColor: Colors.bg 
+  },
   drawerHeaderContent: {},
-  drawerTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.text, marginTop: 10 },
-  drawerSub: { color: Colors.subText },
-  drawerItem: { flexDirection: 'row', padding: 15, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#FAFAFA' },
-  drawerLabel: { marginLeft: 20, fontSize: 16, fontWeight: '500' },
-  avatarLarge: { width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
-  divider: { height: 1, backgroundColor: '#EEE', marginVertical: 10 },
-  loginContainer: { flex: 1, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
-  loginCard: { width: '85%', backgroundColor: '#FFF', padding: 40, borderRadius: 30, alignItems: 'center', elevation: 15 },
-  logoBubble: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 5 },
-  loginTitle: { fontSize: 28, fontWeight: 'bold', color: Colors.primaryDark },
-  loginSub: { color: Colors.subText, marginBottom: 30 },
-  loginBtn: { width: '100%', backgroundColor: Colors.action, padding: 15, borderRadius: 25, alignItems: 'center', elevation: 5, marginTop: 20 },
-  loginInputContainer: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EEE', marginBottom: 20, paddingBottom: 5 },
-  addItemBox: { backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 15, elevation: 3 },
-  subHeader: { fontWeight: 'bold', marginBottom: 10, color: Colors.primary },
-  btnSmall: { backgroundColor: Colors.primary, padding: 10, borderRadius: 8, alignItems: 'center', marginTop: 10 },
-  invCard: { flexDirection: 'row', backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 10, elevation: 2, alignItems: 'center' },
-  invIconBox: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E0F2F1', justifyContent: 'center', alignItems: 'center' },
-  invName: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
-  invStrength: { fontSize: 14, fontWeight: 'normal', color: Colors.subText },
-  invUnit: { fontSize: 12, color: Colors.primary, marginTop: 2, fontStyle: 'italic' },
-  stockStatus: { fontSize: 12, fontWeight: 'bold', marginTop: 4 },
-  counterContainer: { flexDirection: 'row', alignItems: 'center' },
-  counterBtn: { padding: 8 },
-  pickerContainer: { borderWidth: 1, borderColor: '#CFD8DC', borderRadius: 10, backgroundColor: '#FFF', overflow: 'hidden', justifyContent: 'center' },
-  alertWidget: { backgroundColor: '#FFEBEE', padding: 15, borderRadius: 15, borderWidth: 1, borderColor: '#FFCDD2' },
-  alertHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  alertTitle: { color: Colors.danger, fontWeight: 'bold', marginLeft: 10 },
-  alertItem: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-  alertName: { fontWeight: '600', color: Colors.text },
-  alertStatus: { fontSize: 12, fontWeight: 'bold' },
-  revenueCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.dash6, padding: 20, borderRadius: 20, elevation: 5, marginBottom: 10 },
-  revenueLabel: { color: '#FFF', fontSize: 14, opacity: 0.8 },
-  revenueValue: { color: '#FFF', fontSize: 26, fontWeight: 'bold' },
-  procedureCost: { fontSize: 18, fontWeight: 'bold', color: Colors.primary },
-  notesText: { fontSize: 12, color: Colors.subText, fontStyle: 'italic', flexShrink: 1 },
-  drawerContactBox: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 15, width: '100%' },
-  drawerContactBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary + '20', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 20, },
-  drawerContactText: { marginLeft: 8, fontWeight: 'bold', color: Colors.primary },
-  emergencyCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.danger + '20', padding: 15, borderRadius: 15, marginTop: 20 },
-  emergencyTitle: { fontWeight: 'bold', color: Colors.danger },
-  emergencyNumber: { fontSize: 18, color: Colors.text, fontWeight: 'bold' },
-  callNowBtn: { backgroundColor: Colors.danger, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 10 },
-  callNowText: { color: '#FFF', fontWeight: 'bold' },
-  filterContainer: { flexDirection: 'row', justifyContent: 'center', marginVertical: 15, backgroundColor: Colors.primary + '20', borderRadius: 10, padding: 4 },
-  filterButton: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-  filterButtonActive: { backgroundColor: Colors.primary },
-  filterButtonText: { fontWeight: 'bold', color: Colors.primary },
-  filterButtonTextActive: { color: '#FFF' },
-  faqItem: { marginBottom: 15, padding: 10, backgroundColor: Colors.bg, borderRadius: 8 },
-  faqQuestion: { fontWeight: 'bold', color: Colors.primary, marginBottom: 5 },
-  faqAnswer: { color: Colors.subText, fontSize: 14 },
-});
+  drawerTitle: { 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    color: Colors.text, 
+    marginTop: 10 
+  },
+  drawerSub: { 
+    color: Colors.subText 
+  },
+  drawerItem: { 
+    flexDirection: 'row', 
+    padding: 15, 
+    alignItems: 'center', 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#FAFAFA' 
+  },
+  drawerLabel: { 
+    marginLeft: 20, 
+    fontSize: 16, 
+    fontWeight: '500' 
+  },
+  avatarLarge: { 
+    width: 60, 
+    height: 60, 
+    borderRadius: 30, 
+    backgroundColor: Colors.primary, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  avatarText: { 
+    color: '#FFF', 
+    fontSize: 24, 
+    fontWeight: 'bold' 
+  },
+  divider: { 
+    height: 1, 
+    backgroundColor: '#EEE', 
+    marginVertical: 10 
+  },
+  drawerContactBox: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-around', 
+    marginTop: 15, 
+    width: '100%' 
+  },
+  drawerContactBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: Colors.primary + '20', 
+    paddingVertical: 8, 
+    paddingHorizontal: 15, 
+    borderRadius: 20, 
+  },
+  drawerContactText: { 
+    marginLeft: 8, 
+    fontWeight: 'bold', 
+    color: Colors.primary 
+  },
+  
+  // --- LOGIN ---
+  loginContainer: { 
+    flex: 1, 
+    backgroundColor: Colors.primary, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  loginCard: { 
+    width: '85%', 
+    backgroundColor: '#FFF', 
+    padding: 40, 
+    borderRadius: 30, 
+    alignItems: 'center', 
+    elevation: 15 
+  },
+  logoBubble: { 
+    width: 80, 
+    height: 80, 
+    borderRadius: 40, 
+    backgroundColor: Colors.primary, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 20, 
+    elevation: 5 
+  },
+  loginTitle: { 
+    fontSize: 28, 
+    fontWeight: 'bold', 
+    color: Colors.primaryDark 
+  },
+  loginSub: { 
+    color: Colors.subText, 
+    marginBottom: 30 
+  },
+  loginBtn: { 
+    width: '100%', 
+    backgroundColor: Colors.action, 
+    padding: 15, 
+    borderRadius: 25, 
+    alignItems: 'center', 
+    elevation: 5, 
+    marginTop: 20 
+  },
+  loginInputContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#EEE', 
+    marginBottom: 20, 
+    paddingBottom: 5 
+  },
+  
+  // --- INVENTORY ---
+  addItemBox: { 
+    backgroundColor: '#FFF', 
+    padding: 15, 
+    borderRadius: 15, 
+    marginBottom: 15, 
+    elevation: 3 
+  },
+  subHeader: { 
+    fontWeight: 'bold', 
+    marginBottom: 10, 
+    color: Colors.primary 
+  },
+  btnSmall: { 
+    backgroundColor: Colors.primary, 
+    padding: 10, 
+    borderRadius: 8, 
+    alignItems: 'center', 
+    marginTop: 10 
+  },
+  invCard: { 
+    flexDirection: 'row', 
+    backgroundColor: '#FFF', 
+    padding: 15, 
+    borderRadius: 12, 
+    marginBottom: 10, 
+    elevation: 2, 
+    alignItems: 'center' 
+  },
+  invIconBox: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: '#E0F2F1', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  invName: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: Colors.text 
+  },
+  invStrength: { 
+    fontSize: 14, 
+    fontWeight: 'normal', 
+    color: Colors.subText 
+  },
+  invUnit: { 
+    fontSize: 12, 
+    color: Colors.primary, 
+    marginTop: 2, 
+    fontStyle: 'italic' 
+  },
+  stockStatus: { 
+    fontSize: 12, 
+    fontWeight: 'bold', 
+    marginTop: 4 
+  },
+  counterContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
+  counterBtn: { 
+    padding: 8 
+  },
+  
+  // --- ALERTS ---
+  alertWidget: { 
+    backgroundColor: '#FFEBEE', 
+    padding: 15, 
+    borderRadius: 15, 
+    borderWidth: 1, 
+    borderColor: '#FFCDD2' 
+  },
+  alertHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 10 
+  },
+  alertTitle: { 
+    color: Colors.danger, 
+    fontWeight: 'bold', 
+    marginLeft: 10 
+  },
+  alertItem: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginBottom: 5 
+  },
+  alertName: { 
+    fontWeight: '600', 
+    color: Colors.text 
+  },
+  alertStatus: { 
+    fontSize: 12, 
+    fontWeight: 'bold' 
+  },
+  
+  // --- PROCEDURES / REVENUE ---
+  revenueCard: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    backgroundColor: Colors.dash6, 
+    padding: 20, 
+    borderRadius: 20, 
+    elevation: 5, 
+    marginBottom: 10 
+  },
+  revenueLabel: { 
+    color: '#FFF', 
+    fontSize: 14, 
+    opacity: 0.8 
+  },
+  revenueValue: { 
+    color: '#FFF', 
+    fontSize: 26, 
+    fontWeight: 'bold' 
+  },
+  procedureCost: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: Colors.primary 
+  },
+  notesText: { 
+    fontSize: 12, 
+    color: Colors.subText, 
+    fontStyle: 'italic', 
+    flexShrink: 1 
+  },
+  
+  // --- EMERGENCY ---
+  emergencyCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: Colors.danger + '20', 
+    padding: 15, 
+    borderRadius: 15, 
+    marginTop: 20 
+  },
+  emergencyTitle: { 
+    fontWeight: 'bold', 
+    color: Colors.danger 
+  },
+  emergencyNumber: { 
+    fontSize: 18, 
+    color: Colors.text, 
+    fontWeight: 'bold' 
+  },
+  callNowBtn: { 
+    backgroundColor: Colors.danger, 
+    paddingVertical: 10, 
+    paddingHorizontal: 15, 
+    borderRadius: 10 
+  },
+  callNowText: { 
+    color: '#FFF', 
+    fontWeight: 'bold' 
+  },
+  
+  // --- FILTERS ---
+  filterContainer: { 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    marginVertical: 15, 
+    backgroundColor: Colors.primary + '20', 
+    borderRadius: 10, 
+    padding: 4 
+  },
+  filterButton: { 
+    flex: 1, 
+    paddingVertical: 8, 
+    borderRadius: 8, 
+    alignItems: 'center' 
+  },
+  filterButtonActive: { 
+    backgroundColor: Colors.primary 
+  },
+  filterButtonText: { 
+    fontWeight: 'bold', 
+    color: Colors.primary 
+  },
+  filterButtonTextActive: { 
+    color: '#FFF' 
+  },
+});  
