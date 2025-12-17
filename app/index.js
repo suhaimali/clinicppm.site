@@ -1,15 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import {
-  StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView,
-  Dimensions, StatusBar, FlatList, Image, Platform, Alert,
-  LayoutAnimation, UIManager, Modal, SafeAreaView, Linking, ActivityIndicator, Share
-} from 'react-native';
-import { FontAwesome5, MaterialIcons, Ionicons, Entypo, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { Picker } from '@react-native-picker/picker';
+import { Entypo, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
+import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList, Image,
+  LayoutAnimation,
+  Linking,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Share,
+  StatusBar,
+  StyleSheet, Text,
+  TextInput, TouchableOpacity,
+  UIManager,
+  View
+} from 'react-native';
 
 // --- CONFIGURATION ---
 const { width, height } = Dimensions.get('window');
@@ -33,6 +46,7 @@ const Colors = {
   text: '#263238', subText: '#78909C', action: '#5C6BC0', danger: '#EF5350',
   success: '#66BB6A', warning: '#FFA726', whatsapp: '#25D366', dash1: '#26A69A',
   dash2: '#5C6BC0', dash3: '#FFA726', dash4: '#EC407A', dash5: '#6D4C41', dash6: '#6A1B9A',
+  info: '#29B6F6', lightGray: '#ECEFF1', blueHeader: '#448AFF'
 };
 
 // --- SCREENS DEFINITION ---
@@ -49,7 +63,7 @@ const Screens = {
 const INITIAL_PATIENTS = [{ id: '1', name: 'Alice Johnson', age: '29', gender: 'Female', phone: '9876543210', blood: 'O+', image: 'https://randomuser.me/api/portraits/women/44.jpg', vitals: { bp: '118/75', hr: '70', temp: '98.4', spo2: '99', weight: '65' } }, { id: '2', name: 'Robert Smith', age: '54', gender: 'Male', phone: '9123456789', blood: 'A-', image: 'https://randomuser.me/api/portraits/men/32.jpg', vitals: { bp: '140/90', hr: '80', temp: '99.1', spo2: '97', weight: '85' } }, { id: '3', name: 'Charlie Brown', age: '35', gender: 'Male', phone: '9998887770', blood: 'B+', image: 'https://randomuser.me/api/portraits/men/1.jpg', vitals: { bp: '120/80', hr: '75', temp: '98.6', spo2: '98', weight: '70' } },];
 const INITIAL_LABS = [{ id: 'L1', patientId: '1', patientName: 'Alice Johnson', testName: 'Complete Blood Count', date: '2023-11-15', image: null, labNote: 'Hb: 14.5 g/dL (Normal)', result: 'Normal' },];
 const INITIAL_INVENTORY = [{ id: '101', name: 'Paracetamol', strength: '500mg', dosage: 'Tablet', stock: 120, status: 'Good' }, { id: '102', name: 'Amoxicillin', strength: '250mg/5ml', dosage: 'Syrup', stock: 4, status: 'Critical' }, { id: '103', name: 'N95 Masks', strength: 'N/A', dosage: 'Piece', stock: 45, status: 'Good' }, { id: '104', name: 'Cetirizine', strength: '10mg', dosage: 'Tablet', stock: 50, status: 'Good' },];
-const INITIAL_APPOINTMENTS = [{ id: 'a1', time: '09:00 AM', patientName: 'Alice Johnson', type: 'Routine Checkup', reason: 'Headache', status: 'Pending' }, { id: 'a2', time: '10:30 AM', patientName: 'Charlie Brown', type: 'Follow Up', reason: 'Review blood work', status: 'Pending' },];
+const INITIAL_APPOINTMENTS = [{ id: 'a1', time: 'Mon Dec 15 2025 | 09:00 AM', patientName: 'Alice Johnson', type: 'Routine Checkup', reason: 'Headache', status: 'Pending' }, { id: 'a2', time: 'Mon Dec 15 2025 | 10:30 AM', patientName: 'Charlie Brown', type: 'Follow Up', reason: 'Review blood work', status: 'Pending' },];
 const INITIAL_PRESCRIPTIONS = [
   { id: 'rx1', patientId: '1', patientName: 'Alice Johnson', date: '2023-11-18', diagnosis: 'Mild Fever & Headache', notes: 'Rest and Hydrate.', isTapering: false, vitals: { bp: '118/75', hr: '70', temp: '98.4', spo2: '99', weight: '65' }, medicines: [{ id: 'm1', name: 'Paracetamol', strength: '500mg', dosage: 'Tablet', frequency: 'TDS', duration: '3 Days', instructions: 'After food' }], proceduresPerformed: [{ id: 'p01', name: 'Dressing', cost: '150' }], templateName: 'Fever' },
   { id: 'rx2', patientId: '1', patientName: 'Alice Johnson', date: '2023-10-01', diagnosis: 'Common Cold', notes: 'OTC remedies.', isTapering: false, vitals: { bp: '120/80', hr: '72', temp: '99.0', spo2: '98', weight: '65' }, medicines: [{ id: 'm3', name: 'Cetirizine', strength: '10mg', dosage: 'Tablet', frequency: 'OD', duration: '5 Days', instructions: 'Before bed' }], proceduresPerformed: [], templateName: 'Cold' },
@@ -57,7 +71,6 @@ const INITIAL_PRESCRIPTIONS = [
 ];
 const INITIAL_TEMPLATES = [{ id: 'template-none', name: 'None', diagnosis: '', medicines: [] }, { id: 'template-cold', name: 'Cold', diagnosis: 'Common Cold / Allergic Rhinitis', medicines: [{ id: 'tm1', name: 'Cetirizine', strength: '10mg', dosage: 'Tablet', frequency: 'OD', duration: '5 Days', instructions: 'At night' }, { id: 'tm2', name: 'Paracetamol', strength: '500mg', dosage: 'Tablet', frequency: 'PRN', duration: 'As needed', instructions: 'For fever/body ache' }] }, { id: 'template-fever', name: 'Fever', diagnosis: 'Viral Fever', medicines: [{ id: 'tm3', name: 'Paracetamol', strength: '650mg', dosage: 'Tablet', frequency: 'TDS', duration: '3 Days', instructions: 'After food' }] }];
 const INITIAL_PROCEDURES = [{ id: 'p1', patientId: '1', patientName: 'Alice Johnson', procedureName: 'Wound Dressing', date: '2023-11-20', cost: '500', notes: 'Minor scrape on the left knee.' }, { id: 'p2', patientId: '2', patientName: 'Robert Smith', procedureName: 'Suture Removal', date: '2023-11-18', cost: '300', notes: 'Post-op follow-up.' }, { id: 'p3', patientId: '1', patientName: 'Alice Johnson', procedureName: 'IV Fluid Administration', date: '2023-10-05', cost: '800', notes: 'Dehydration.' },];
-const TIME_SLOTS = ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '04:00 PM', '04:30 PM', '05:00 PM'];
 const FREQUENCY_OPTIONS = ['OD', 'BD', 'TDS', 'QID', 'PRN', 'SOS'];
 const DURATION_OPTIONS = ['3 Days', '5 Days', '7 Days', '10 Days', '1 Month', 'As needed'];
 const VITAL_KEYS = { SpO2: 'spo2', BP: 'bp', HR: 'hr', Temp: 'temp', Weight: 'weight' };
@@ -88,7 +101,32 @@ export default function App() {
 
   const navigate = (screen, data = null) => { setIsLoading(true); setTimeout(() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setSelectedData(data); setCurrentScreen(screen); setDrawerOpen(false); setIsLoading(false); }, 400); };
   const handleLogin = (username, password) => { setIsLoading(true); setTimeout(() => { if (username === '1' && password === '1') { setIsLoading(false); navigate(Screens.DASHBOARD); } else { setIsLoading(false); Alert.alert("Login Failed", "Invalid Username or Password.\nTry: 1 / 1"); } }, 1500); };
-  const handleAppointmentDone = (id) => { Alert.alert("Confirm Done", "Mark appointment as complete and remove from today's list?", [{ text: "Cancel" }, { text: "Done", style: 'destructive', onPress: () => { setIsLoading(true); setTimeout(() => { setAppointments(appointments.filter(a => a.id !== id)); setIsLoading(false); }, 500); } }]); };
+  
+  // Delete Appointment
+  const handleDeleteAppointment = (id) => { 
+    Alert.alert("Confirm Delete", "Remove this appointment?", [
+      { text: "Cancel" }, 
+      { text: "Delete", style: 'destructive', onPress: () => { 
+          setIsLoading(true); 
+          setTimeout(() => { 
+            setAppointments(appointments.filter(a => a.id !== id)); 
+            setIsLoading(false); 
+          }, 500); 
+        } 
+      }
+    ]); 
+  };
+  
+  // Update Appointment (Edit)
+  const handleUpdateAppointment = (id, newTime, newNotes) => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setAppointments(appointments.map(a => a.id === id ? { ...a, time: newTime, reason: newNotes } : a));
+      setIsLoading(false);
+      Alert.alert("Success", "Appointment Updated Successfully");
+    }, 500);
+  };
+
   const handleSavePatient = (p, appointmentDetails) => { setIsLoading(true); setTimeout(() => { let savedPatient = p; if (p.id) { setPatients(patients.map(x => x.id === p.id ? p : x)); } else { const newPatientId = Date.now().toString(); savedPatient = { ...p, id: newPatientId, vitals: { weight: p.vitals.weight || '', ...p.vitals } }; setPatients(prev => [...prev, savedPatient]); } if (appointmentDetails && appointmentDetails.bookit) { const newAppt = { id: 'appt_' + Date.now(), time: appointmentDetails.time, patientName: savedPatient.name, type: appointmentDetails.type || 'Consultation', reason: appointmentDetails.reason, status: 'Pending' }; setAppointments(prev => [...prev, newAppt]); Alert.alert("Success", `Patient Saved & Appointment Booked for ${savedPatient.name} at ${newAppt.time}!`); } else { Alert.alert("Success", "Patient Saved Successfully"); } setIsLoading(false); navigate(Screens.PATIENT_LIST); }, 1000); };
   const handleDeletePatient = (id) => { Alert.alert("Confirm Delete", "Are you sure? This will delete all associated records.", [{ text: "Cancel" }, { text: "Delete", style: 'destructive', onPress: () => { setIsLoading(true); setTimeout(() => { setPatients(patients.filter(x => x.id !== id)); setPrescriptions(prescriptions.filter(rx => rx.patientId !== id)); setLabs(labs.filter(l => l.patientId !== id)); setProcedures(procedures.filter(p => p.patientId !== id)); const patientToDelete = patients.find(p => p.id === id); if (patientToDelete) { setAppointments(appointments.filter(a => a.patientName !== patientToDelete.name)); } setIsLoading(false); navigate(Screens.PATIENT_LIST); }, 800); } }]); };
 
@@ -137,7 +175,7 @@ export default function App() {
   const renderContent = () => {
     switch (currentScreen) {
       case Screens.LOGIN: return <LoginScreen onLogin={handleLogin} />;
-      case Screens.DASHBOARD: return <Dashboard patients={patients} appointments={appointments} inventory={inventory} templates={rxTemplates} procedures={procedures} prescriptions={prescriptions} navigate={navigate} openDrawer={() => setDrawerOpen(true)} onDeleteAppt={handleAppointmentDone} />;
+      case Screens.DASHBOARD: return <Dashboard patients={patients} setPatients={setPatients} appointments={appointments} inventory={inventory} templates={rxTemplates} procedures={procedures} prescriptions={prescriptions} navigate={navigate} openDrawer={() => setDrawerOpen(true)} onDeleteAppt={handleDeleteAppointment} onUpdateAppt={handleUpdateAppointment} />;
       case Screens.PATIENT_LIST: return <PatientList patients={patients} navigate={navigate} onDelete={handleDeletePatient} onEdit={(p) => navigate(Screens.ADD_PATIENT, p)} onBook={handleQuickBook} />;
       case Screens.ADD_PATIENT: return <PatientForm initialData={selectedData} onSave={handleSavePatient} onCancel={() => navigate(Screens.PATIENT_LIST)} />;
       case Screens.PATIENT_DETAILS: return <PatientDetails patient={selectedData} labs={labs} navigate={navigate} />;
@@ -199,77 +237,233 @@ export default function App() {
   );
 }
 
-const AllPrescriptionHistoryScreen = ({ allPrescriptions, patients, navigate, onDeleteRx }) => {
-  const [viewRx, setViewRx] = useState(null);
-  const [search, setSearch] = useState('');
-  const filteredPrescriptions = allPrescriptions.filter(rx =>
-    rx.patientName.toLowerCase().includes(search.toLowerCase()) ||
-    rx.diagnosis.toLowerCase().includes(search.toLowerCase())
-  );
-  const RxTableItem = ({ item }) => {
-    const patient = patients.find(p => p.id === item.patientId);
-    return (<View key={item.id} style={styles.rxTableItem}>
-      <View style={styles.rxTableCol}>
-        <Text style={styles.rxDate}>{item.date}</Text>
-        <Text style={styles.rxDiagnosis}>{item.diagnosis}</Text>
-        <Text style={{ fontSize: 12, color: Colors.text, fontWeight: 'bold' }}>{item.patientName}</Text>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <TouchableOpacity onPress={() => setViewRx(item)} style={[styles.iconBtn, { backgroundColor: Colors.action + '20' }]}>
-          <FontAwesome5 name="eye" size={14} color={Colors.action} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => navigate(Screens.ADD_RX, { ...item, isEdit: true, patient: patient })}
-          style={[styles.iconBtn, { marginLeft: 5, backgroundColor: Colors.primary + '20' }]}>
-          <FontAwesome5 name="pen" size={14} color={Colors.primary} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => onDeleteRx(item.id)} style={[styles.iconBtn, { marginLeft: 5, backgroundColor: Colors.danger + '20' }]}>
-          <FontAwesome5 name="trash" size={14} color={Colors.danger} />
-        </TouchableOpacity>
-      </View>
-    </View>);
-  };
-  return (
-    <View style={styles.screenContainer}>
-      <Header title="All Patient Rx History" onBack={() => navigate(Screens.DASHBOARD)} />
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={Colors.subText} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search Patient or Diagnosis..."
-          value={search}
-          onChangeText={setSearch}
-        />
-      </View>
-      <Text style={[styles.sectionTitle, { paddingHorizontal: 20, marginTop: 0 }]}>Records (<Text>{filteredPrescriptions.length}</Text>)</Text>
-
-      <View style={{ paddingHorizontal: 20, flex: 1 }}>
-        <View style={[styles.rxTable, { marginBottom: 20 }]}>
-          <View style={styles.rxTableHeader}>
-            <Text style={styles.rxHeaderCol}>Patient/Details</Text>
-            <Text style={{ width: 120, textAlign: 'right', fontWeight: 'bold', color: Colors.text }}>Actions</Text>
-          </View>
-          <FlatList
-            data={filteredPrescriptions}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => <RxTableItem item={item} />}
-            ListEmptyComponent={<View style={{ padding: 20, alignItems: 'center' }}><Text style={styles.emptyText}>No matching prescriptions found.</Text></View>}
-          />
-        </View>
-      </View>
-
-      <PrescriptionDetailModal rx={viewRx} onClose={() => setViewRx(null)} />
-    </View>
-  );
-};
-
-const LoginScreen = ({ onLogin }) => {
-  const [user, setUser] = useState(''); const [pass, setPass] = useState('');
-  return (<View style={styles.loginContainer}><View style={styles.loginCard}><View style={styles.logoBubble}><FontAwesome5 name="hospital-user" size={40} color="#FFF" /></View><Text style={styles.loginTitle}>Dr Login.</Text><Text style={styles.loginSub}>Clinic Management</Text><View style={styles.loginInputContainer}><FontAwesome5 name="user" size={16} color={Colors.subText} style={{ marginRight: 10 }} /><TextInput placeholder="Username" style={{ flex: 1 }} value={user} onChangeText={setUser} autoCapitalize="none" /></View><View style={styles.loginInputContainer}><FontAwesome5 name="lock" size={16} color={Colors.subText} style={{ marginRight: 10 }} /><TextInput placeholder="Password" style={{ flex: 1 }} value={pass} onChangeText={setPass} secureTextEntry={true} /></View><TouchableOpacity style={styles.loginBtn} onPress={() => onLogin(user, pass)}><Text style={styles.btnText}>LOGIN</Text></TouchableOpacity><Text style={{ marginTop: 15, color: Colors.subText, fontSize: 12 }}>Default: 1 / 1</Text></View></View>);
-};
-
-const Dashboard = ({ patients, appointments, inventory, templates, procedures, prescriptions, navigate, openDrawer, onDeleteAppt }) => {
+// --- DASHBOARD COMPONENT ---
+const Dashboard = ({ patients, appointments, inventory, templates, procedures, prescriptions, navigate, openDrawer, onDeleteAppt, onUpdateAppt, setPatients }) => {
+  const [apptSearch, setApptSearch] = useState('');
+  const [editAppt, setEditAppt] = useState(null); 
+  const [viewAppt, setViewAppt] = useState(null);
   const lowStock = inventory.filter(i => i.status !== 'Good');
+  
+  const filteredAppointments = appointments.filter(a => 
+    a.patientName.toLowerCase().includes(apptSearch.toLowerCase())
+  );
+
+  // --- EDIT MODAL WITH DATEPICKER & VITALS ---
+  const EditApptModal = () => {
+    const patientData = patients.find(p => p.name === editAppt?.patientName);
+    
+    const [timeString, setTimeString] = useState(editAppt?.time || '');
+    const [notes, setNotes] = useState(editAppt?.reason || '');
+    
+    // Date Picker States
+    const [date, setDate] = useState(new Date());
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [mode, setMode] = useState('date'); // 'date' or 'time'
+
+    // Vitals State
+    const [vitals, setVitals] = useState({
+      spo2: patientData?.vitals?.spo2 || '',
+      bp: patientData?.vitals?.bp || '',
+      hr: patientData?.vitals?.hr || '',
+      temp: patientData?.vitals?.temp || '',
+      weight: patientData?.vitals?.weight || ''
+    });
+
+    useEffect(() => {
+      if (editAppt) {
+        setTimeString(editAppt.time);
+        setNotes(editAppt.reason);
+        if(patientData) {
+          setVitals(patientData.vitals);
+        }
+      }
+    }, [editAppt]);
+
+    const handleDateChange = (event, selectedDate) => {
+        const currentDate = selectedDate || date;
+        setShowDatePicker(false);
+        setDate(currentDate);
+
+        if(mode === 'date') {
+            setMode('time');
+            setTimeout(() => setShowDatePicker(true), 100); // Small delay to reopen for time
+        } else {
+            // Both date and time selected, format string
+            const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+            const timeOpt = { hour: '2-digit', minute: '2-digit' };
+            const datePart = currentDate.toLocaleDateString('en-US', options).replace(/,/g, '');
+            const timePart = currentDate.toLocaleTimeString('en-US', timeOpt);
+            setTimeString(`${datePart} | ${timePart}`);
+            setMode('date'); // Reset for next time
+        }
+    };
+
+    if(!editAppt) return null;
+
+    const handleSaveChanges = () => {
+      onUpdateAppt(editAppt.id, timeString, notes);
+      if (patientData) {
+        const updatedPatient = { ...patientData, vitals: vitals };
+         setPatients(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
+      }
+      setEditAppt(null);
+    };
+
+    return (
+      <Modal visible={!!editAppt} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentLarge}>
+            {/* Header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={styles.modalIconBg}>
+                <FontAwesome5 name="edit" size={20} color={Colors.action} />
+              </View>
+              <View style={{flex:1, marginLeft:10}}>
+                <Text style={styles.modalTitleLeft}>Edit Booking</Text>
+                <Text style={styles.modalSubTitle}>Update details for {editAppt.patientName}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setEditAppt(null)}>
+                <Ionicons name="close" size={24} color={Colors.subText} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Info Card */}
+              <View style={styles.infoCard}>
+                <View style={styles.infoRow}>
+                  <View style={{flex:1}}>
+                    <Text style={styles.infoLabel}>PATIENT NAME</Text>
+                    <Text style={styles.infoValue}>{editAppt.patientName}</Text>
+                  </View>
+                  <View style={{flex:1}}>
+                    <Text style={styles.infoLabel}>DOCTOR</Text>
+                    <Text style={styles.infoValue}>Dr. MANSOOR ALI.V.P</Text>
+                  </View>
+                </View>
+                <View style={[styles.infoRow, {marginTop:15}]}>
+                  <View style={{flex:1}}>
+                    <Text style={styles.infoLabel}>APPOINTMENT TIME</Text>
+                    {/* Date Picker Trigger */}
+                    <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                        <Text style={[styles.infoValue, {color: Colors.action, textDecorationLine:'underline'}]}>
+                            {timeString || "Select Time"}
+                        </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{flex:1}}>
+                    <Text style={styles.infoLabel}>BOOKING ID</Text>
+                    <Text style={styles.infoValue}>{editAppt.id.toUpperCase().slice(0,8)}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Vitals Section */}
+              <View style={styles.sectionHeaderLine}>
+                <View style={styles.blueBar} />
+                <Text style={styles.sectionHeaderTitle}>Patient Vitals</Text>
+              </View>
+
+              <View style={styles.vitalsRow}>
+                <View style={styles.vitalInputContainer}>
+                  <Text style={styles.label}>SpO2 (%)</Text>
+                  <TextInput style={styles.inputBox} value={vitals.spo2} onChangeText={t=>setVitals({...vitals, spo2:t})} keyboardType="numeric" placeholder="98" />
+                </View>
+                <View style={styles.vitalInputContainer}>
+                  <Text style={styles.label}>BP (mmHg)</Text>
+                  <TextInput style={styles.inputBox} value={vitals.bp} onChangeText={t=>setVitals({...vitals, bp:t})} placeholder="120/80" />
+                </View>
+                <View style={styles.vitalInputContainer}>
+                  <Text style={styles.label}>Pulse (bpm)</Text>
+                  <TextInput style={styles.inputBox} value={vitals.hr} onChangeText={t=>setVitals({...vitals, hr:t})} keyboardType="numeric" placeholder="72" />
+                </View>
+              </View>
+
+              <View style={styles.vitalsRow}>
+                <View style={styles.vitalInputContainer}>
+                  <Text style={styles.label}>Temp</Text>
+                  <TextInput style={styles.inputBox} value={vitals.temp} onChangeText={t=>setVitals({...vitals, temp:t})} placeholder="98.6F" />
+                </View>
+                <View style={styles.vitalInputContainer}>
+                  <Text style={styles.label}>Weight (kg)</Text>
+                  <TextInput style={styles.inputBox} value={vitals.weight} onChangeText={t=>setVitals({...vitals, weight:t})} keyboardType="numeric" placeholder="70" />
+                </View>
+              </View>
+
+              <View style={styles.warningBox}>
+                <Text style={styles.warningText}>Note: Updating vitals here will update the patient's current record.</Text>
+              </View>
+
+              {/* Booking Notes */}
+              <View style={[styles.sectionHeaderLine, {marginTop:15}]}>
+                <View style={[styles.blueBar, {backgroundColor: Colors.dash6}]} />
+                <Text style={styles.sectionHeaderTitle}>Booking Notes</Text>
+              </View>
+              <TextInput 
+                style={[styles.inputBox, {height: 100, textAlignVertical: 'top'}]} 
+                multiline={true} 
+                value={notes} 
+                onChangeText={setNotes} 
+                placeholder="Add booking notes..." 
+              />
+
+              <View style={{height: 20}} />
+            </ScrollView>
+
+            {/* Footer Buttons */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.btnOutline} onPress={() => setEditAppt(null)}>
+                <Text style={styles.btnOutlineText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.btnBlue} onPress={handleSaveChanges}>
+                <FontAwesome5 name="save" size={14} color="#FFF" style={{marginRight:8}} />
+                <Text style={styles.btnBlueText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {showDatePicker && (
+                <DateTimePicker
+                    value={date}
+                    mode={mode}
+                    is24Hour={false}
+                    display="default"
+                    onChange={handleDateChange}
+                />
+            )}
+
+          </View>
+        </View>
+      </Modal>
+    )
+  };
+
+  const ViewApptModal = () => {
+    if(!viewAppt) return null;
+    return (
+       <Modal visible={!!viewAppt} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={{alignItems:'center', marginBottom:15}}>
+              <View style={[styles.iconCircle, {backgroundColor: Colors.info + '20'}]}>
+                <FontAwesome5 name="calendar-check" size={30} color={Colors.info} />
+              </View>
+              <Text style={styles.modalTitle}>Appointment Details</Text>
+            </View>
+            <View style={{backgroundColor: Colors.bg, padding:15, borderRadius:10}}>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Patient:</Text><Text style={styles.detailValue}>{viewAppt.patientName}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Time:</Text><Text style={styles.detailValue}>{viewAppt.time}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Type:</Text><Text style={styles.detailValue}>{viewAppt.type}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Notes:</Text><Text style={styles.detailValue}>{viewAppt.reason}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Status:</Text><Text style={[styles.detailValue, {color: Colors.warning}]}>{viewAppt.status}</Text></View>
+            </View>
+            <TouchableOpacity style={[styles.btnPrimary, { marginTop: 20 }]} onPress={() => setViewAppt(null)}>
+              <Text style={styles.btnText}>CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+       </Modal>
+    );
+  }
+
   const EmergencyContactWidget = () => (
     <View style={styles.emergencyCard}>
       <FontAwesome5 name="first-aid" size={24} color={Colors.danger} />
@@ -282,14 +476,211 @@ const Dashboard = ({ patients, appointments, inventory, templates, procedures, p
       </TouchableOpacity>
     </View>
   );
-  return (<View style={styles.screenContainer}><View style={styles.header}><TouchableOpacity onPress={openDrawer}><MaterialIcons name="sort" size={30} color="#FFF" /></TouchableOpacity><Text style={styles.headerTitle}>Dashboard</Text><View style={{ width: 30 }} /></View><ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 50 }}><View style={styles.welcomeBanner}><View><Text style={styles.welcomeText}>Welcome Back,</Text><Text style={styles.docName}>{DOCTOR_NAME}</Text></View><FontAwesome5 name="user-md" size={35} color="#FFF" opacity={0.8} /></View><View style={styles.gridContainer}><DashboardCard title="Patients" count={patients.length} icon="users" color={Colors.dash1} onPress={() => navigate(Screens.PATIENT_LIST)} /><DashboardCard title="Reports" count="View" icon="flask" color={Colors.dash2} onPress={() => navigate(Screens.LAB_LIST)} /><DashboardCard title="Medicine" count={inventory.length} icon="capsules" color={Colors.dash3} onPress={() => navigate(Screens.INVENTORY)} /><DashboardCard title="Schedule" count={appointments.length} icon="calendar-alt" color={Colors.dash4} onPress={() => { }} /><DashboardCard title="Templates" count={templates.length - 1} icon="file-signature" color={Colors.dash5} onPress={() => navigate(Screens.TEMPLATE_MANAGER)} /><DashboardCard title="Procedures" count={procedures.length} icon="stethoscope" color={Colors.dash6} onPress={() => navigate(Screens.PROCEDURES_HISTORY)} /></View>
 
-    <Text style={styles.sectionTitle}>Today's Appointments</Text>{appointments.length === 0 ? (<Text style={{ color: Colors.subText, fontStyle: 'italic' }}>No appointments scheduled.</Text>) : (appointments.map(a => (<View key={a.id} style={styles.apptCard}><View style={styles.timeBox}><Text style={styles.timeText}>{a.time}</Text></View><View style={{ flex: 1, marginLeft: 15 }}><Text style={styles.apptName}>{a.patientName}</Text><Text style={styles.apptType}>{a.type} - {a.reason}</Text></View><TouchableOpacity onPress={() => onDeleteAppt(a.id)} style={{ backgroundColor: Colors.success + '20', padding: 8, borderRadius: 10 }}><FontAwesome5 name="check" size={18} color={Colors.success} /></TouchableOpacity></View>)))}{lowStock.length > 0 ? (<View style={[styles.alertWidget, { marginTop: 20 }]}><View style={styles.alertHeader}><MaterialIcons name="warning" size={24} color={Colors.danger} /><Text style={styles.alertTitle}>Stock Alert</Text></View>{lowStock.slice(0, 2).map(item => (<View key={item.id} style={styles.alertItem}><Text style={styles.alertName}>{item.name}</Text><Text style={[styles.alertStatus, { color: Colors.danger }]}>{item.stock} Left</Text></View>))}{lowStock.length > 2 ? <Text style={{ fontSize: 12, color: Colors.subText, textAlign: 'right' }}>...and {lowStock.length - 2} more</Text> : null}</View>) : null}<EmergencyContactWidget /></ScrollView></View>);
+  return (
+    <View style={styles.screenContainer}>
+      <EditApptModal />
+      <ViewApptModal />
+      
+      <View style={styles.header}>
+        <TouchableOpacity onPress={openDrawer}><MaterialIcons name="sort" size={30} color="#FFF" /></TouchableOpacity>
+        <Text style={styles.headerTitle}>Dashboard</Text>
+        <View style={{ width: 30 }} />
+      </View>
+      
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 50 }}>
+        <View style={styles.welcomeBanner}>
+          <View><Text style={styles.welcomeText}>Welcome Back,</Text><Text style={styles.docName}>{DOCTOR_NAME}</Text></View>
+          <FontAwesome5 name="user-md" size={35} color="#FFF" opacity={0.8} />
+        </View>
+        
+        <View style={styles.gridContainer}>
+          <DashboardCard title="Patients" count={patients.length} icon="users" color={Colors.dash1} onPress={() => navigate(Screens.PATIENT_LIST)} />
+          <DashboardCard title="Reports" count="View" icon="flask" color={Colors.dash2} onPress={() => navigate(Screens.LAB_LIST)} />
+          <DashboardCard title="Medicine" count={inventory.length} icon="capsules" color={Colors.dash3} onPress={() => navigate(Screens.INVENTORY)} />
+          <DashboardCard title="Schedule" count={appointments.length} icon="calendar-alt" color={Colors.dash4} onPress={() => { }} />
+          <DashboardCard title="Templates" count={templates.length - 1} icon="file-signature" color={Colors.dash5} onPress={() => navigate(Screens.TEMPLATE_MANAGER)} />
+          <DashboardCard title="Procedures" count={procedures.length} icon="stethoscope" color={Colors.dash6} onPress={() => navigate(Screens.PROCEDURES_HISTORY)} />
+        </View>
+
+        <Text style={styles.sectionTitle}>Today's Appointments</Text>
+        
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color={Colors.subText} />
+          <TextInput 
+            style={styles.searchInput} 
+            placeholder="Search Appointments..." 
+            value={apptSearch} 
+            onChangeText={setApptSearch} 
+          />
+        </View>
+
+        {filteredAppointments.length === 0 ? (
+          <Text style={{ color: Colors.subText, fontStyle: 'italic', textAlign:'center', marginTop:10 }}>
+            {appointments.length === 0 ? "No appointments today." : "No matching appointments."}
+          </Text>
+        ) : (
+          filteredAppointments.map((a, index) => (
+            <View key={a.id} style={[styles.apptCardNew, { borderLeftColor: index % 2 === 0 ? Colors.dash1 : Colors.dash4 }]}>
+              <View style={styles.apptTimeBox}>
+                 <Text style={styles.apptTimeTextBig}>{a.time.includes('|') ? a.time.split('|')[1].trim().split(' ')[0] : a.time.split(' ')[0]}</Text>
+                 <Text style={styles.apptTimeTextSmall}>{a.time.includes('|') ? a.time.split('|')[1].trim().split(' ')[1] : a.time.split(' ')[1]}</Text>
+              </View>
+              
+              <View style={{ flex: 1, marginLeft: 15, justifyContent:'center' }}>
+                <Text style={styles.apptName}>{a.patientName}</Text>
+                <Text style={styles.apptType}>{a.type}</Text>
+                <Text style={styles.apptReason} numberOfLines={1}>{a.reason}</Text>
+              </View>
+              
+              <View style={styles.apptActionRow}>
+                {/* View Button */}
+                <TouchableOpacity onPress={() => setViewAppt(a)} style={[styles.iconBtnNew, { backgroundColor: Colors.info }]}>
+                  <FontAwesome5 name="eye" size={14} color="#FFF" />
+                </TouchableOpacity>
+                
+                {/* Edit Button */}
+                <TouchableOpacity onPress={() => setEditAppt(a)} style={[styles.iconBtnNew, { backgroundColor: Colors.warning, marginHorizontal:8 }]}>
+                  <FontAwesome5 name="pen" size={14} color="#FFF" />
+                </TouchableOpacity>
+                
+                {/* Delete Button (Changed from Check) */}
+                <TouchableOpacity onPress={() => onDeleteAppt(a.id)} style={[styles.iconBtnNew, { backgroundColor: Colors.danger }]}>
+                  <FontAwesome5 name="trash" size={14} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+        
+        {lowStock.length > 0 ? (
+          <View style={[styles.alertWidget, { marginTop: 20 }]}>
+            <View style={styles.alertHeader}>
+              <MaterialIcons name="warning" size={24} color={Colors.danger} />
+              <Text style={styles.alertTitle}>Stock Alert</Text>
+            </View>
+            {lowStock.slice(0, 2).map(item => (
+              <View key={item.id} style={styles.alertItem}>
+                <Text style={styles.alertName}>{item.name}</Text>
+                <Text style={[styles.alertStatus, { color: Colors.danger }]}>{item.stock} Left</Text>
+              </View>
+            ))}
+            {lowStock.length > 2 ? <Text style={{ fontSize: 12, color: Colors.subText, textAlign: 'right' }}>...and {lowStock.length - 2} more</Text> : null}
+          </View>
+        ) : null}
+        
+        <EmergencyContactWidget />
+      </ScrollView>
+    </View>
+  );
+};
+
+// --- UPDATED PRESCRIPTION DETAIL MODAL (COLORFUL UI) ---
+const PrescriptionDetailModal = ({ rx, onClose }) => {
+  if (!rx) return null; 
+
+  const getVitalValue = (key, unit = '') => { 
+    const val = rx.vitals?.[key]; 
+    if (val === null || val === undefined || val === '') return 'N/A'; 
+    const displayUnit = key === 'bp' ? '' : unit; 
+    return `${val}${displayUnit}`; 
+  };
+
+  const RxDetailItem = ({ label, value, color }) => (
+    <View style={[styles.rxDetailItem, {borderColor: color}]}>
+      <Text style={[styles.rxDetailLabel, {color: color}]}>{label}</Text>
+      <Text style={styles.rxDetailValue}>{value}</Text>
+    </View>
+  );
+
+  return (
+    <Modal visible={!!rx} transparent={true} animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContentLarge}>
+          
+          {/* Colorful Header */}
+          <View style={styles.colorfulHeader}>
+            <View>
+                <Text style={styles.headerPatientName}>{rx.patientName}</Text>
+                <Text style={styles.headerDate}>{rx.date}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtnHeader}>
+                <Ionicons name="close" size={24} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{padding: 20}}>
+            {/* Diagnosis Card */}
+            <View style={styles.diagnosisCard}>
+                <Text style={styles.diagnosisLabel}>DIAGNOSIS</Text>
+                <Text style={styles.diagnosisText}>{rx.diagnosis}</Text>
+            </View>
+
+            {/* Vitals Strip */}
+            <Text style={styles.sectionHeaderTitle}>Patient Vitals</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
+                <RxDetailItem label="BP" value={getVitalValue('bp')} color={Colors.action} />
+                <RxDetailItem label="HR" value={getVitalValue('hr', ' bpm')} color={Colors.danger} />
+                <RxDetailItem label="Temp" value={getVitalValue('temp', '°F')} color={Colors.warning} />
+                <RxDetailItem label="SpO2" value={getVitalValue('spo2', '%')} color={Colors.success} />
+                <RxDetailItem label="Weight" value={getVitalValue('weight', ' kg')} color={Colors.primary} />
+            </ScrollView>
+
+            {/* Medicines List */}
+            <Text style={styles.sectionHeaderTitle}>Medicines Prescribed</Text>
+            {rx.medicines.length === 0 ? <Text style={styles.emptyText}>No medicines.</Text> : rx.medicines.map((med, index) => (
+                <View key={index} style={styles.medicineRow}>
+                    <View style={styles.medIconBox}>
+                        <FontAwesome5 name="pills" size={16} color={Colors.primary} />
+                    </View>
+                    <View style={{flex:1, marginLeft: 15}}>
+                        <Text style={styles.medNameDetail}>{med.name} <Text style={{fontWeight:'normal', fontSize:12, color:Colors.subText}}>{med.strength}</Text></Text>
+                        <Text style={styles.medInstructionsDetail}>{med.dosage} | {med.frequency} | {med.duration}</Text>
+                        {med.instructions ? <Text style={styles.medNote}>Note: {med.instructions}</Text> : null}
+                    </View>
+                </View>
+            ))}
+
+            {/* Procedures */}
+            {rx.proceduresPerformed && rx.proceduresPerformed.length > 0 && (
+                <View style={{marginTop: 15}}>
+                    <Text style={styles.sectionHeaderTitle}>Procedures</Text>
+                    {rx.proceduresPerformed.map((proc, index) => (
+                        <View key={index} style={styles.procedureRow}>
+                            <FontAwesome5 name="notes-medical" size={14} color={Colors.dash6} />
+                            <Text style={{marginLeft:10, fontWeight:'bold', color: Colors.text}}>{proc.name}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+
+            {/* Doctor's Notes */}
+            {rx.notes ? (
+                <View style={styles.noteBox}>
+                    <Text style={styles.noteTitle}>Doctor's Notes</Text>
+                    <Text style={styles.noteContent}>{rx.notes}</Text>
+                </View>
+            ) : null}
+
+            <View style={{height: 30}} />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// ... (Other components: LoginScreen, PatientList, etc. remain the same as previously provided) ...
+// Included here for completeness if you need to copy-paste the whole file.
+
+const LoginScreen = ({ onLogin }) => {
+  const [user, setUser] = useState(''); const [pass, setPass] = useState('');
+  return (<View style={styles.loginContainer}><View style={styles.loginCard}><View style={styles.logoBubble}><FontAwesome5 name="hospital-user" size={40} color="#FFF" /></View><Text style={styles.loginTitle}>Dr Login.</Text><Text style={styles.loginSub}>Clinic Management</Text><View style={styles.loginInputContainer}><FontAwesome5 name="user" size={16} color={Colors.subText} style={{ marginRight: 10 }} /><TextInput placeholder="Username" style={{ flex: 1 }} value={user} onChangeText={setUser} autoCapitalize="none" /></View><View style={styles.loginInputContainer}><FontAwesome5 name="lock" size={16} color={Colors.subText} style={{ marginRight: 10 }} /><TextInput placeholder="Password" style={{ flex: 1 }} value={pass} onChangeText={setPass} secureTextEntry={true} /></View><TouchableOpacity style={styles.loginBtn} onPress={() => onLogin(user, pass)}><Text style={styles.btnText}>LOGIN</Text></TouchableOpacity><Text style={{ marginTop: 15, color: Colors.subText, fontSize: 12 }}>Default: 1 / 1</Text></View></View>);
 };
 
 const PatientList = ({ patients, navigate, onDelete, onEdit, onBook }) => {
   const [search, setSearch] = useState(''); const [bookModal, setBookModal] = useState(null); const [apptTime, setApptTime] = useState('09:00 AM'); const [apptReason, setApptReason] = useState(''); const [isFollowUp, setIsFollowUp] = useState(false); const filtered = patients.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-  return (<View style={styles.screenContainer}><Header title="Patients" onBack={() => navigate(Screens.DASHBOARD)} onAdd={() => navigate(Screens.ADD_PATIENT)} /><View style={styles.searchContainer}><Ionicons name="search" size={20} color={Colors.subText} /><TextInput style={styles.searchInput} placeholder="Search Patient..." value={search} onChangeText={setSearch} /></View><FlatList data={filtered} keyExtractor={i => i.id} contentContainerStyle={{ padding: 20 }} renderItem={({ item }) => (<View key={item.id} style={styles.card}><TouchableOpacity style={styles.row} onPress={() => navigate(Screens.PATIENT_DETAILS, item)}><Image source={{ uri: item.image || 'https://via.placeholder.com/50' }} style={styles.listAvatar} /><View style={{ flex: 1, marginLeft: 15 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.cardSub}>{item.gender}, {item.age} yrs</Text></View></TouchableOpacity><View style={styles.cardActions}><TouchableOpacity onPress={() => setBookModal(item)} style={styles.actionLabelBtn}><FontAwesome5 name="calendar-plus" size={14} color={Colors.primary} /><Text style={styles.actionLabelText}>Book</Text></TouchableOpacity><TouchableOpacity onPress={() => onEdit(item)} style={styles.iconBtn}><FontAwesome5 name="pen" size={14} color={Colors.action} /></TouchableOpacity><TouchableOpacity onPress={() => onDelete(item.id)} style={[styles.iconBtn, { marginLeft: 10 }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity></View></View>)} /><Modal visible={!!bookModal} transparent={true} animationType="slide"><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Book Appointment</Text><Text style={{ textAlign: 'center', color: Colors.primary, marginBottom: 15, fontWeight: 'bold' }}>{bookModal?.name}</Text><View style={styles.timeGrid}>{TIME_SLOTS.slice(0, 6).map(t => (<TouchableOpacity key={t} style={[styles.timeSlot, apptTime === t && styles.activeTimeSlot]} onPress={() => setApptTime(t)}><Text style={[styles.timeSlotText, apptTime === t && { color: '#FFF' }]}>{t}</Text></TouchableOpacity>))}</View><Input label="Reason" value={apptReason} onChange={setApptReason} /><TouchableOpacity style={[styles.row, { marginBottom: 20 }]} onPress={() => setIsFollowUp(!isFollowUp)}><FontAwesome5 name={isFollowUp ? "check-square" : "square"} size={20} color={Colors.primary} /><Text style={{ marginLeft: 10, color: Colors.text }}>Follow Up?</Text></TouchableOpacity><View style={styles.row}><TouchableOpacity style={[styles.btnPrimary, { flex: 1, backgroundColor: Colors.subText, marginRight: 10 }]} onPress={() => setBookModal(null)}><Text style={styles.btnText}>CANCEL</Text></TouchableOpacity><TouchableOpacity style={[styles.btnPrimary, { flex: 1 }]} onPress={() => { onBook(bookModal, apptTime, apptReason, isFollowUp ? 'Follow Up' : 'Consultation'); setBookModal(null); }}><Text style={styles.btnText}>CONFIRM</Text></TouchableOpacity></View></View></View></Modal></View>);
+  return (<View style={styles.screenContainer}><Header title="Patients" onBack={() => navigate(Screens.DASHBOARD)} onAdd={() => navigate(Screens.ADD_PATIENT)} /><View style={styles.searchContainer}><Ionicons name="search" size={20} color={Colors.subText} /><TextInput style={styles.searchInput} placeholder="Search Patient..." value={search} onChangeText={setSearch} /></View><FlatList data={filtered} keyExtractor={i => i.id} contentContainerStyle={{ padding: 20 }} renderItem={({ item }) => (<View key={item.id} style={styles.card}><TouchableOpacity style={styles.row} onPress={() => navigate(Screens.PATIENT_DETAILS, item)}><Image source={{ uri: item.image || 'https://via.placeholder.com/50' }} style={styles.listAvatar} /><View style={{ flex: 1, marginLeft: 15 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.cardSub}>{item.gender}, {item.age} yrs</Text></View></TouchableOpacity><View style={styles.cardActions}><TouchableOpacity onPress={() => setBookModal(item)} style={styles.actionLabelBtn}><FontAwesome5 name="calendar-plus" size={14} color={Colors.primary} /><Text style={styles.actionLabelText}>Book</Text></TouchableOpacity><TouchableOpacity onPress={() => onEdit(item)} style={styles.iconBtn}><FontAwesome5 name="pen" size={14} color={Colors.action} /></TouchableOpacity><TouchableOpacity onPress={() => onDelete(item.id)} style={[styles.iconBtn, { marginLeft: 10 }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity></View></View>)} /><Modal visible={!!bookModal} transparent={true} animationType="slide"><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Book Appointment</Text><Text style={{ textAlign: 'center', color: Colors.primary, marginBottom: 15, fontWeight: 'bold' }}>{bookModal?.name}</Text><Input label="Reason" value={apptReason} onChange={setApptReason} /><TouchableOpacity style={[styles.row, { marginBottom: 20 }]} onPress={() => setIsFollowUp(!isFollowUp)}><FontAwesome5 name={isFollowUp ? "check-square" : "square"} size={20} color={Colors.primary} /><Text style={{ marginLeft: 10, color: Colors.text }}>Follow Up?</Text></TouchableOpacity><View style={styles.row}><TouchableOpacity style={[styles.btnPrimary, { flex: 1, backgroundColor: Colors.subText, marginRight: 10 }]} onPress={() => setBookModal(null)}><Text style={styles.btnText}>CANCEL</Text></TouchableOpacity><TouchableOpacity style={[styles.btnPrimary, { flex: 1 }]} onPress={() => { onBook(bookModal, apptTime, apptReason, isFollowUp ? 'Follow Up' : 'Consultation'); setBookModal(null); }}><Text style={styles.btnText}>CONFIRM</Text></TouchableOpacity></View></View></View></Modal></View>);
 };
 
 const PatientDetails = ({ patient, labs, navigate }) => {
@@ -307,8 +698,8 @@ const PatientDetails = ({ patient, labs, navigate }) => {
 };
 
 const PatientForm = ({ initialData, onSave, onCancel }) => {
-  const [form, setForm] = useState(initialData || { name: '', age: '', gender: 'Male', phone: '', blood: '', image: null, vitals: { bp: '', hr: '', temp: '', spo2: '', weight: '' } }); const [bookAppt, setBookAppt] = useState(false); const [apptTime, setApptTime] = useState('09:00 AM'); const [apptReason, setApptReason] = useState(''); const [isFollowUp, setIsFollowUp] = useState(false); const [showTimeModal, setShowTimeModal] = useState(false); const pickImage = async () => { let r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.5, allowsEditing: true }); if (!r.canceled) setForm({ ...form, image: r.assets[0].uri }); };
-  return (<View style={styles.screenContainer}><Header title={initialData ? "Edit Patient" : "Add New Patient"} onBack={onCancel} /><ScrollView contentContainerStyle={{ padding: 20 }}><TouchableOpacity style={styles.uploadCircle} onPress={pickImage}>{form.image ? <Image source={{ uri: form.image }} style={{ width: '100%', height: '100%', borderRadius: 50 }} /> : <FontAwesome5 name="camera" size={24} color={Colors.primary} />}</TouchableOpacity><Input label="Full Name" value={form.name} onChange={t => setForm({ ...form, name: t })} /><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="Age" kbd="numeric" value={form.age} onChange={t => setForm({ ...form, age: t })} /><Input style={{ flex: 1 }} label="Blood Group" value={form.blood} onChange={t => setForm({ ...form, blood: t })} /></View><Input label="Phone" kbd="phone-pad" value={form.phone} onChange={t => setForm({ ...form, phone: t })} /><Text style={styles.sectionTitle}>Vital Signs</Text><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="SpO2 (%)" kbd="numeric" value={form.vitals.spo2} onChange={t => setForm({ ...form, vitals: { ...form.vitals, spo2: t } })} /><Input style={{ flex: 1 }} label="BP (mmHg)" value={form.vitals.bp} onChange={t => setForm({ ...form, vitals: { ...form.vitals, bp: t } })} /></View><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="Pulse (bpm)" kbd="numeric" value={form.vitals.hr} onChange={t => setForm({ ...form, vitals: { ...form.vitals, hr: t } })} /><Input style={{ flex: 1 }} label="Temperature (°F)" kbd="numeric" value={form.vitals.temp} onChange={t => setForm({ ...form, vitals: { ...form.vitals, temp: t } })} /></View><Input label="Weight (kg)" kbd="numeric" value={form.vitals.weight} onChange={t => setForm({ ...form, vitals: { ...form.vitals, weight: t } })} /><View style={styles.apptSection}><View style={styles.row}><Text style={styles.sectionTitleSmall}>Book Appointment?</Text><TouchableOpacity style={[styles.toggleBtn, { backgroundColor: bookAppt ? Colors.success : '#CCC' }]} onPress={() => setBookAppt(!bookAppt)}><FontAwesome5 name={bookAppt ? "check" : "times"} size={16} color="#FFF" /></TouchableOpacity></View>{bookAppt ? (<View style={{ marginTop: 10 }}><Text style={styles.label}>Select Time</Text><TouchableOpacity style={styles.pickerBtn} onPress={() => setShowTimeModal(true)}><Text style={styles.pickerText}>{apptTime}</Text><FontAwesome5 name="clock" size={16} color={Colors.primary} /></TouchableOpacity><Input label="Reason for Visit" value={apptReason} onChange={setApptReason} style={{ marginTop: 10 }} /><TouchableOpacity style={[styles.row, { marginTop: 10 }]} onPress={() => setIsFollowUp(!isFollowUp)}><MaterialCommunityIcons name={isFollowUp ? "checkbox-marked" : "checkbox-blank-outline"} size={24} color={Colors.primary} /><Text style={{ marginLeft: 10, color: Colors.text, fontWeight: '600' }}>Follow Up Appointment</Text></TouchableOpacity></View>) : null}</View><TouchableOpacity style={styles.btnPrimary} onPress={() => onSave(form, bookAppt ? { bookit: true, time: apptTime, type: isFollowUp ? 'Follow Up' : 'Consultation', reason: apptReason } : { bookit: false })}><Text style={styles.btnText}>SAVE RECORD</Text></TouchableOpacity></ScrollView><Modal visible={showTimeModal} transparent={true} animationType="fade"><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Select Appointment Time</Text><View style={styles.timeGrid}>{TIME_SLOTS.map(time => (<TouchableOpacity key={time} style={[styles.timeSlot, apptTime === time && styles.activeTimeSlot]} onPress={() => { setApptTime(time); setShowTimeModal(false); }}><Text style={[styles.timeSlotText, apptTime === time && { color: '#FFF' }]}>{time}</Text></TouchableOpacity>))}</View><TouchableOpacity style={styles.modalClose} onPress={() => setShowTimeModal(false)}><Text style={{ color: Colors.danger }}>Cancel</Text></TouchableOpacity></View></View></Modal></View>);
+  const [form, setForm] = useState(initialData || { name: '', age: '', gender: 'Male', phone: '', blood: '', image: null, vitals: { bp: '', hr: '', temp: '', spo2: '', weight: '' } }); const [bookAppt, setBookAppt] = useState(false); const [apptTime, setApptTime] = useState('09:00 AM'); const [apptReason, setApptReason] = useState(''); const [isFollowUp, setIsFollowUp] = useState(false); const pickImage = async () => { let r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.5, allowsEditing: true }); if (!r.canceled) setForm({ ...form, image: r.assets[0].uri }); };
+  return (<View style={styles.screenContainer}><Header title={initialData ? "Edit Patient" : "Add New Patient"} onBack={onCancel} /><ScrollView contentContainerStyle={{ padding: 20 }}><TouchableOpacity style={styles.uploadCircle} onPress={pickImage}>{form.image ? <Image source={{ uri: form.image }} style={{ width: '100%', height: '100%', borderRadius: 50 }} /> : <FontAwesome5 name="camera" size={24} color={Colors.primary} />}</TouchableOpacity><Input label="Full Name" value={form.name} onChange={t => setForm({ ...form, name: t })} /><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="Age" kbd="numeric" value={form.age} onChange={t => setForm({ ...form, age: t })} /><Input style={{ flex: 1 }} label="Blood Group" value={form.blood} onChange={t => setForm({ ...form, blood: t })} /></View><Input label="Phone" kbd="phone-pad" value={form.phone} onChange={t => setForm({ ...form, phone: t })} /><Text style={styles.sectionTitle}>Vital Signs</Text><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="SpO2 (%)" kbd="numeric" value={form.vitals.spo2} onChange={t => setForm({ ...form, vitals: { ...form.vitals, spo2: t } })} /><Input style={{ flex: 1 }} label="BP (mmHg)" value={form.vitals.bp} onChange={t => setForm({ ...form, vitals: { ...form.vitals, bp: t } })} /></View><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="Pulse (bpm)" kbd="numeric" value={form.vitals.hr} onChange={t => setForm({ ...form, vitals: { ...form.vitals, hr: t } })} /><Input style={{ flex: 1 }} label="Temperature (°F)" kbd="numeric" value={form.vitals.temp} onChange={t => setForm({ ...form, vitals: { ...form.vitals, temp: t } })} /></View><Input label="Weight (kg)" kbd="numeric" value={form.vitals.weight} onChange={t => setForm({ ...form, vitals: { ...form.vitals, weight: t } })} /><View style={styles.apptSection}><View style={styles.row}><Text style={styles.sectionTitleSmall}>Book Appointment?</Text><TouchableOpacity style={[styles.toggleBtn, { backgroundColor: bookAppt ? Colors.success : '#CCC' }]} onPress={() => setBookAppt(!bookAppt)}><FontAwesome5 name={bookAppt ? "check" : "times"} size={16} color="#FFF" /></TouchableOpacity></View>{bookAppt ? (<View style={{ marginTop: 10 }}><Text style={styles.label}>Reason</Text><Input label="Reason for Visit" value={apptReason} onChange={setApptReason} style={{ marginTop: 10 }} /><TouchableOpacity style={[styles.row, { marginTop: 10 }]} onPress={() => setIsFollowUp(!isFollowUp)}><MaterialCommunityIcons name={isFollowUp ? "checkbox-marked" : "checkbox-blank-outline"} size={24} color={Colors.primary} /><Text style={{ marginLeft: 10, color: Colors.text, fontWeight: '600' }}>Follow Up Appointment</Text></TouchableOpacity></View>) : null}</View><TouchableOpacity style={styles.btnPrimary} onPress={() => onSave(form, bookAppt ? { bookit: true, time: apptTime, type: isFollowUp ? 'Follow Up' : 'Consultation', reason: apptReason } : { bookit: false })}><Text style={styles.btnText}>SAVE RECORD</Text></TouchableOpacity></ScrollView></View>);
 };
 
 const LabList = ({ labs, navigate, onDelete, onEdit }) => {
@@ -496,15 +887,6 @@ const AddProcedureForm = ({ initialData, patients, onSave, onCancel }) => {
   return (<View style={styles.screenContainer}><Header title={isEdit ? "Edit Procedure" : "Add Procedure"} onBack={onCancel} /><ScrollView contentContainerStyle={{ padding: 20 }}><Text style={styles.label}>Select Patient</Text><View style={styles.pickerContainer}><Picker selectedValue={form.patientId} onValueChange={v => setForm({ ...form, patientId: v })}>{patients.map(p => <Picker.Item key={p.id} label={p.name} value={p.id} />)}</Picker></View><Input label="Procedure Name" placeholder="e.g., Suture, Dressing" value={form.procedureName} onChange={t => setForm({ ...form, procedureName: t })} /><View style={styles.row}><View style={{ flex: 1, marginRight: 10 }}><Text style={styles.label}>Date</Text><TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.pickerBtn}><Text style={styles.pickerText}>{form.date}</Text><FontAwesome5 name="calendar-alt" size={16} color={Colors.primary} /></TouchableOpacity></View><Input style={{ flex: 1 }} label="Cost (₹)" kbd="numeric" value={form.cost} onChange={t => setForm({ ...form, cost: t })} /></View>{showDatePicker ? <DateTimePicker value={date} mode="date" display="default" onChange={onDateChange} maximumDate={new Date()} /> : null}<Input label="Notes (Optional)" placeholder="Any relevant notes..." value={form.notes} onChange={t => setForm({ ...form, notes: t })} multiline={true} style={{ height: 100 }} /><TouchableOpacity style={styles.btnPrimary} onPress={handleSave}><Text style={styles.btnText}>{isEdit ? 'UPDATE' : 'SAVE'} PROCEDURE</Text></TouchableOpacity></ScrollView></View>);
 };
 
-const PrescriptionDetailModal = ({ rx, onClose }) => {
-  if (!rx) return null; const getVitalValue = (key, unit = '') => { const val = rx.vitals?.[key]; if (val === null || val === undefined || val === '') return 'N/A'; const displayUnit = key === 'bp' ? '' : unit; return `${val}${displayUnit}`; };
-  return (<Modal visible={!!rx} transparent={true} animationType="fade"><View style={styles.modalOverlay}><View style={[styles.modalContent, { width: '90%' }]}><Text style={styles.modalTitle}>Prescription Details</Text><Text style={{ textAlign: 'center', color: Colors.subText, marginBottom: 15 }}>{rx.patientName} - {rx.date}</Text><ScrollView style={{ maxHeight: height * 0.7 }}><Text style={styles.sectionTitleSmall}>Diagnosis</Text><Text style={styles.detailText}>{rx.diagnosis}</Text><Text style={[styles.sectionTitleSmall, { marginTop: 10 }]}>Vitals</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}><DetailPill label="BP" value={getVitalValue('bp')} unit="mmHg" color={Colors.action} /><DetailPill label="HR" value={getVitalValue('hr')} unit="bpm" color={Colors.danger} /><DetailPill label="Temp" value={getVitalValue('temp')} unit="°F" color={Colors.warning} /><DetailPill label="SpO2" value={getVitalValue('spo2')} unit="%" color={Colors.success} /><DetailPill label="Weight" value={getVitalValue('weight')} unit="kg" color={Colors.primary} /></View><Text style={[styles.sectionTitleSmall, { marginTop: 10 }]}>Medicines</Text>{rx.medicines.length === 0 ? <Text style={styles.emptyText}>No medicines prescribed.</Text> : rx.medicines.map((med, index) => (
-    <View key={med.id || index} style={styles.medDetailItem}><Text style={styles.medNameDetail}>{index + 1}. {med.name} {med.strength}</Text><Text style={styles.medDetailsDetail}>{med.dosage} | {med.frequency} for {med.duration}</Text><Text style={styles.medInstructionsDetail}>* {med.instructions}</Text></View>
-  ))}{rx.proceduresPerformed && rx.proceduresPerformed.length > 0 ? (<><Text style={[styles.sectionTitleSmall, { marginTop: 10 }]}>Procedures</Text>{rx.proceduresPerformed.map((proc, index) => (
-    <View key={proc.id || index} style={styles.medDetailItem}><Text style={styles.medNameDetail}>{proc.name} (Cost: ₹{proc.cost})</Text></View>
-  ))}</>) : null}{rx.notes ? (<><Text style={[styles.sectionTitleSmall, { marginTop: 10 }]}>Doctor's Notes</Text><Text style={styles.detailText}>{rx.notes}</Text></>) : null}</ScrollView><TouchableOpacity style={[styles.btnPrimary, { backgroundColor: Colors.subText, padding: 10, marginTop: 15 }]} onPress={onClose}><Text style={[styles.btnText, { fontSize: 14 }]}>CLOSE</Text></TouchableOpacity></View></View></Modal>);
-};
-
 const DetailPill = ({ label, value, unit, color }) => (<View style={{ flexDirection: 'row', backgroundColor: color + '15', padding: 8, borderRadius: 10, margin: 3, flexBasis: '47%', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, color: color, fontWeight: 'bold' }}>{label}: </Text><Text style={{ fontSize: 14, color: Colors.text }}>{value} <Text style={{ fontSize: 10, color: Colors.subText }}>{value !== 'N/A' ? unit : ''}</Text></Text></View>);
 
 const Header = ({ title, onBack, onAdd }) => (<View style={styles.header}>{onBack ? <TouchableOpacity onPress={onBack}><MaterialIcons name="arrow-back-ios" size={24} color="#FFF" /></TouchableOpacity> : null}<Text style={styles.headerTitle}>{title}</Text>{onAdd ? <TouchableOpacity onPress={onAdd}><MaterialIcons name="add" size={32} color="#FFF" /></TouchableOpacity> : <View style={{ width: 32 }} />}</View>);
@@ -512,42 +894,117 @@ const DashboardCard = ({ title, count, icon, color, onPress }) => (<TouchableOpa
 const VitalBox = ({ label, val, unit, icon, color }) => (<View style={[styles.vitalCard, { borderTopColor: color }]}><FontAwesome5 name={icon} size={20} color={color} /><Text style={styles.vitalVal}>{val || 'N/A'} <Text style={{ fontSize: 12, color: Colors.subText }}>{val ? unit : ''}</Text></Text><Text style={styles.vitalLabel}>{label}</Text></View>);
 const Input = ({ label, value, onChange, style, kbd, placeholder, multiline }) => (<View style={[{ marginBottom: 15 }, style]}><Text style={styles.label}>{label}</Text><TextInput style={[styles.inputBox, multiline && { height: style?.height || 80, textAlignVertical: 'top' }]} value={value} onChangeText={onChange} keyboardType={kbd || 'default'} placeholder={placeholder} multiline={multiline} /></View>);
 const DrawerItem = ({ icon, label, color, onPress }) => (<TouchableOpacity style={styles.drawerItem} onPress={onPress}><FontAwesome5 name={icon} size={20} color={color} style={{ width: 40 }} /><Text style={[styles.drawerLabel, { color }]}>{label}</Text></TouchableOpacity>);
-
 const styles = StyleSheet.create({
+  // --- LAYOUT & BASICS ---
   container: { flex: 1, backgroundColor: Colors.bg },
   screenContainer: { flex: 1, backgroundColor: Colors.bg },
   header: { height: 80, backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 15, paddingHorizontal: 20, borderBottomLeftRadius: 25, borderBottomRightRadius: 25, elevation: 10 },
   headerTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold', flex: 1, textAlign: 'center' },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginTop: 15, marginBottom: 10 },
+  
+  // --- LOADER ---
   loaderOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   loaderBox: { backgroundColor: '#FFF', padding: 25, borderRadius: 15, alignItems: 'center', elevation: 10 },
   loaderText: { marginTop: 10, color: Colors.text, fontWeight: 'bold' },
+  
+  // --- DASHBOARD ---
   welcomeBanner: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.primaryDark, padding: 20, borderRadius: 20, marginBottom: 20 },
   welcomeText: { color: '#FFF', fontSize: 14, opacity: 0.8 },
   docName: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
+  
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   gridCard: { width: CARD_WIDTH, backgroundColor: '#FFF', borderRadius: 20, padding: 20, marginBottom: 15, alignItems: 'center', elevation: 4 },
   iconCircle: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
   gridCount: { fontSize: 24, fontWeight: 'bold', color: Colors.text },
   gridTitle: { fontSize: 14, color: Colors.subText },
-  apptCard: { flexDirection: 'row', backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 10, alignItems: 'center', elevation: 2 },
-  timeBox: { backgroundColor: '#E0F2F1', padding: 8, borderRadius: 8 },
-  timeText: { color: Colors.primary, fontWeight: 'bold' },
+  
+  // --- APPOINTMENT CARDS (Dashboard) ---
+  apptCardNew: { flexDirection: 'row', backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 12, elevation: 3, borderLeftWidth: 5 },
+  apptTimeBox: { justifyContent: 'center', alignItems: 'center', paddingRight: 10, borderRightWidth: 1, borderRightColor: '#EEE', width: 60 },
+  apptTimeTextBig: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
+  apptTimeTextSmall: { fontSize: 10, color: Colors.subText },
   apptName: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
-  apptType: { fontSize: 12, color: Colors.subText },
+  apptType: { fontSize: 12, color: Colors.primary, fontWeight: 'bold', marginTop: 2 },
+  apptReason: { fontSize: 12, color: Colors.subText, marginTop: 2, fontStyle: 'italic' },
+  apptActionRow: { flexDirection: 'row', alignItems: 'center' },
+  iconBtnNew: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+
+  // --- GENERAL FORM SECTIONS ---
   apptSection: { backgroundColor: '#E0F7FA', padding: 15, borderRadius: 10, marginBottom: 20, borderLeftWidth: 5, borderLeftColor: Colors.primary },
+  sectionHeaderLine: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 15, marginTop: 10 },
+  blueBar: { width: 4, height: 20, backgroundColor: '#3182CE', marginRight: 10, borderRadius: 2 },
+  sectionHeaderTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
   sectionTitleSmall: { fontSize: 16, fontWeight: 'bold', color: Colors.primaryDark, flex: 1 },
+
+  // --- FORM INPUTS ---
+  label: { fontSize: 12, fontWeight: 'bold', color: Colors.subText, marginBottom: 5, marginTop: 5 },
+  inputBox: { backgroundColor: '#FFF', borderRadius: 10, padding: Platform.OS === 'ios' ? 15 : 12, fontSize: 16, borderWidth: 1, borderColor: '#CFD8DC' },
+  inputBoxRx: { backgroundColor: '#FFF', borderRadius: 10, padding: 12, fontSize: 16, borderWidth: 1, borderColor: '#CFD8DC', flexDirection: 'row', alignItems: 'center' },
   toggleBtn: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   pickerBtn: { flexDirection: 'row', backgroundColor: '#FFF', padding: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#B2DFDB' },
   pickerText: { fontSize: 16, fontWeight: 'bold', color: Colors.primary },
+  pickerBtnSmall: { flexDirection: 'row', backgroundColor: '#FFF', padding: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#B2DFDB' },
+  pickerTextSmall: { fontSize: 14, fontWeight: 'bold', color: Colors.primary },
+  pickerContainer: { borderWidth: 1, borderColor: '#CFD8DC', borderRadius: 10, backgroundColor: '#FFF', overflow: 'hidden', justifyContent: 'center' },
+  uploadCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#E0F2F1', alignSelf: 'center', justifyContent: 'center', alignItems: 'center', marginBottom: 20, overflow: 'hidden' },
+
+  // --- MODALS (General) ---
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', backgroundColor: '#FFF', borderRadius: 20, padding: 20 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
-  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  timeSlot: { padding: 10, margin: 5, borderRadius: 8, borderWidth: 1, borderColor: '#EEE', backgroundColor: '#FAFAFA' },
-  activeTimeSlot: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  timeSlotText: { color: Colors.text },
   modalClose: { marginTop: 15, alignItems: 'center', padding: 10 },
+
+  // --- EDIT BOOKING MODAL (Specific) ---
+  modalContentLarge: { width: '90%', height: '85%', backgroundColor: '#FFF', borderRadius: 20, padding: 0, overflow: 'hidden' },
+  modalHeaderRow: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  modalIconBg: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center' },
+  modalTitleLeft: { fontSize: 18, fontWeight: 'bold', color: Colors.text },
+  modalSubTitle: { fontSize: 12, color: Colors.subText },
+  
+  infoCard: { backgroundColor: '#F8F9FA', borderRadius: 12, padding: 20, margin: 20, marginBottom: 10 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  infoLabel: { fontSize: 10, fontWeight: 'bold', color: '#A0AEC0', letterSpacing: 1, marginBottom: 4 },
+  infoValue: { fontSize: 14, fontWeight: '500', color: Colors.text },
+  
+  vitalsRow: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 20, marginBottom: 10 },
+  vitalInputContainer: { flex: 1, marginRight: 10 },
+  
+  warningBox: { backgroundColor: '#FFFBE6', borderWidth: 1, borderColor: '#FFE58F', borderRadius: 8, padding: 10, marginHorizontal: 20, marginTop: 10 },
+  warningText: { color: '#D48806', fontSize: 12 },
+  
+  modalFooter: { padding: 20, borderTopWidth: 1, borderTopColor: '#EEE', flexDirection: 'row', justifyContent: 'flex-end' },
+  btnOutline: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E0', marginRight: 10 },
+  btnOutlineText: { color: Colors.text },
+  btnBlue: { backgroundColor: '#3182CE', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
+  btnBlueText: { color: '#FFF', fontWeight: 'bold' },
+
+  // --- RX HISTORY DETAIL MODAL (Colorful Eye Pop-up) ---
+  colorfulHeader: { backgroundColor: Colors.blueHeader, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerPatientName: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
+  headerDate: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
+  closeBtnHeader: { padding: 5 },
+  
+  diagnosisCard: { backgroundColor: '#FFF', borderRadius: 15, padding: 15, marginBottom: 20, elevation: 2, borderLeftWidth: 5, borderLeftColor: Colors.primary },
+  diagnosisLabel: { fontSize: 10, fontWeight: 'bold', color: Colors.subText, letterSpacing: 1 },
+  diagnosisText: { fontSize: 18, fontWeight: 'bold', color: Colors.primaryDark, marginTop: 5 },
+  
+  rxDetailItem: { borderBottomWidth: 2, padding: 10, marginRight: 10, borderRadius: 8, backgroundColor: '#F7FAFC', minWidth: 80, alignItems: 'center' },
+  rxDetailLabel: { fontSize: 12, fontWeight: 'bold', marginBottom: 2 },
+  rxDetailValue: { fontSize: 16, fontWeight: '600', color: Colors.text },
+  
+  medicineRow: { flexDirection: 'row', backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 10, alignItems: 'center', borderWidth: 1, borderColor: '#EDF2F7' },
+  medIconBox: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E6FFFA', justifyContent: 'center', alignItems: 'center' },
+  medNameDetail: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
+  medInstructionsDetail: { color: Colors.subText, fontSize: 12, marginTop: 2 },
+  medNote: { color: Colors.action, fontSize: 12, fontStyle: 'italic', marginTop: 2 },
+  
+  procedureRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAF5FF', padding: 10, borderRadius: 8, marginBottom: 5 },
+  
+  noteBox: { backgroundColor: '#FFFFF0', padding: 15, borderRadius: 10, marginTop: 20, borderWidth: 1, borderColor: '#F0E68C' },
+  noteTitle: { fontWeight: 'bold', color: '#B7791F', marginBottom: 5 },
+  noteContent: { color: '#744210', fontStyle: 'italic' },
+  
+  // --- CARDS (Patient List / Inventory / Reports) ---
   card: { backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 12, elevation: 3 },
   row: { flexDirection: 'row', alignItems: 'center' },
   cardTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
@@ -557,8 +1014,12 @@ const styles = StyleSheet.create({
   actionLabelBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E0F2F1', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 5, marginRight: 10 },
   actionLabelText: { color: Colors.primary, fontSize: 12, fontWeight: 'bold', marginLeft: 5 },
   iconBtn: { padding: 8, backgroundColor: '#F5F7FA', borderRadius: 8 },
-  searchContainer: { flexDirection: 'row', backgroundColor: '#FFF', margin: 20, marginBottom: 10, borderRadius: 10, padding: 10, alignItems: 'center', elevation: 2 },
+
+  // --- SEARCH BAR ---
+  searchContainer: { flexDirection: 'row', backgroundColor: '#FFF', marginBottom: 15, borderRadius: 10, padding: 10, alignItems: 'center', elevation: 2 },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 16 },
+
+  // --- PATIENT ID CARD ---
   idCard: { backgroundColor: Colors.text, borderRadius: 20, padding: 20, marginBottom: 20, elevation: 8 },
   idTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   idTitle: { color: '#FFF', fontWeight: 'bold', letterSpacing: 2 },
@@ -566,18 +1027,23 @@ const styles = StyleSheet.create({
   idPhoto: { width: 90, height: 110, borderRadius: 10, backgroundColor: '#EEE' },
   idName: { color: Colors.primary, fontSize: 20, fontWeight: 'bold', marginBottom: 5 },
   idRow: { color: '#CFD8DC', fontSize: 12, marginBottom: 3 },
+
+  // --- VITALS WIDGETS ---
   vitalGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   vitalCard: { width: '30%', backgroundColor: '#FFF', padding: 10, borderRadius: 12, alignItems: 'center', borderTopWidth: 4, elevation: 3, justifyContent: 'space-between' },
   vitalVal: { fontSize: 18, fontWeight: 'bold', marginTop: 5 },
   vitalLabel: { fontSize: 12, color: Colors.subText },
-  uploadCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#E0F2F1', alignSelf: 'center', justifyContent: 'center', alignItems: 'center', marginBottom: 20, overflow: 'hidden' },
-  label: { fontSize: 12, fontWeight: 'bold', color: Colors.subText, marginBottom: 5, marginTop: 5 },
-  inputBox: { backgroundColor: '#FFF', borderRadius: 10, padding: Platform.OS === 'ios' ? 15 : 12, fontSize: 16, borderWidth: 1, borderColor: '#CFD8DC' },
+
+  // --- BUTTONS ---
   btnPrimary: { backgroundColor: Colors.primary, padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10, elevation: 5 },
   btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+  btnSmall: { backgroundColor: Colors.primary, padding: 10, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+
+  // --- LABS ---
   labThumb: { width: 50, height: 50, borderRadius: 10, backgroundColor: '#E0F2F1', justifyContent: 'center', alignItems: 'center' },
   imagePicker: { height: 150, backgroundColor: '#F5F7FA', borderRadius: 15, borderStyle: 'dashed', borderWidth: 2, borderColor: '#CFD8DC', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  inputBoxRx: { backgroundColor: '#FFF', borderRadius: 10, padding: 12, fontSize: 16, borderWidth: 1, borderColor: '#CFD8DC', flexDirection: 'row', alignItems: 'center' },
+
+  // --- TABLES (Rx / History) ---
   rxTable: { backgroundColor: Colors.card, borderRadius: 15, elevation: 2, overflow: 'hidden' },
   rxTableHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, backgroundColor: Colors.bg, borderBottomWidth: 1, borderBottomColor: '#EEE' },
   rxHeaderCol: { flex: 1, fontWeight: 'bold', color: Colors.text },
@@ -585,19 +1051,23 @@ const styles = StyleSheet.create({
   rxTableCol: { flex: 1, paddingRight: 10 },
   rxDate: { fontSize: 12, color: Colors.subText },
   rxDiagnosis: { fontSize: 15, fontWeight: '600', color: Colors.text, marginTop: 2 },
+  
+  // --- EMPTY STATE ---
   emptyState: { alignItems: 'center', padding: 40, backgroundColor: Colors.card, borderRadius: 15, marginTop: 20 },
   emptyText: { color: Colors.subText, marginTop: 15, fontSize: 16, fontStyle: 'italic', textAlign: 'center' },
-  pickerBtnSmall: { flexDirection: 'row', backgroundColor: '#FFF', padding: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#B2DFDB' },
-  pickerTextSmall: { fontSize: 14, fontWeight: 'bold', color: Colors.primary },
+
+  // --- MEDICINE CARD (Inside Forms) ---
   medCard: { flexDirection: 'row', backgroundColor: '#F5F7FA', padding: 10, borderRadius: 10, marginBottom: 8, alignItems: 'center', borderLeftWidth: 4, borderLeftColor: Colors.primary },
   medName: { fontWeight: 'bold', color: Colors.text },
   medDetails: { fontSize: 12, color: Colors.subText, fontStyle: 'italic' },
   medInstructions: { fontSize: 12, color: Colors.action, marginTop: 5 },
-  detailText: { padding: 10, backgroundColor: Colors.bg, borderRadius: 8, marginBottom: 10, color: Colors.text },
-  medDetailItem: { borderBottomWidth: 1, borderBottomColor: '#EEE', paddingVertical: 10, marginBottom: 5 },
-  medNameDetail: { fontWeight: 'bold', color: Colors.primaryDark, fontSize: 15 },
-  medDetailsDetail: { fontSize: 12, color: Colors.subText, marginTop: 2 },
-  medInstructionsDetail: { fontSize: 13, color: Colors.text, marginTop: 5 },
+  
+  // --- SIMPLE DETAIL ROWS ---
+  detailRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  detailLabel: { width: 80, fontWeight: 'bold', color: Colors.subText },
+  detailValue: { flex: 1, color: Colors.text, fontWeight: '600' },
+
+  // --- DRAWER ---
   drawerOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100, flexDirection: 'row' },
   drawer: { width: width * 0.75, backgroundColor: '#FFF', height: '100%' },
   drawerHeader: { justifyContent: 'flex-end', padding: 20, backgroundColor: Colors.bg },
@@ -609,6 +1079,11 @@ const styles = StyleSheet.create({
   avatarLarge: { width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
   avatarText: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
   divider: { height: 1, backgroundColor: '#EEE', marginVertical: 10 },
+  drawerContactBox: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 15, width: '100%' },
+  drawerContactBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary + '20', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 20, },
+  drawerContactText: { marginLeft: 8, fontWeight: 'bold', color: Colors.primary },
+
+  // --- LOGIN ---
   loginContainer: { flex: 1, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
   loginCard: { width: '85%', backgroundColor: '#FFF', padding: 40, borderRadius: 30, alignItems: 'center', elevation: 15 },
   logoBubble: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 5 },
@@ -616,9 +1091,10 @@ const styles = StyleSheet.create({
   loginSub: { color: Colors.subText, marginBottom: 30 },
   loginBtn: { width: '100%', backgroundColor: Colors.action, padding: 15, borderRadius: 25, alignItems: 'center', elevation: 5, marginTop: 20 },
   loginInputContainer: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EEE', marginBottom: 20, paddingBottom: 5 },
+
+  // --- INVENTORY ---
   addItemBox: { backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 15, elevation: 3 },
   subHeader: { fontWeight: 'bold', marginBottom: 10, color: Colors.primary },
-  btnSmall: { backgroundColor: Colors.primary, padding: 10, borderRadius: 8, alignItems: 'center', marginTop: 10 },
   invCard: { flexDirection: 'row', backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 10, elevation: 2, alignItems: 'center' },
   invIconBox: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E0F2F1', justifyContent: 'center', alignItems: 'center' },
   invName: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
@@ -627,29 +1103,32 @@ const styles = StyleSheet.create({
   stockStatus: { fontSize: 12, fontWeight: 'bold', marginTop: 4 },
   counterContainer: { flexDirection: 'row', alignItems: 'center' },
   counterBtn: { padding: 8 },
-  pickerContainer: { borderWidth: 1, borderColor: '#CFD8DC', borderRadius: 10, backgroundColor: '#FFF', overflow: 'hidden', justifyContent: 'center' },
+
+  // --- ALERTS & WIDGETS ---
   alertWidget: { backgroundColor: '#FFEBEE', padding: 15, borderRadius: 15, borderWidth: 1, borderColor: '#FFCDD2' },
   alertHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   alertTitle: { color: Colors.danger, fontWeight: 'bold', marginLeft: 10 },
   alertItem: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
   alertName: { fontWeight: '600', color: Colors.text },
   alertStatus: { fontSize: 12, fontWeight: 'bold' },
+  
   revenueCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.dash6, padding: 20, borderRadius: 20, elevation: 5, marginBottom: 10 },
   revenueLabel: { color: '#FFF', fontSize: 14, opacity: 0.8 },
   revenueValue: { color: '#FFF', fontSize: 26, fontWeight: 'bold' },
   procedureCost: { fontSize: 18, fontWeight: 'bold', color: Colors.primary },
   notesText: { fontSize: 12, color: Colors.subText, fontStyle: 'italic', flexShrink: 1 },
-  drawerContactBox: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 15, width: '100%' },
-  drawerContactBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary + '20', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 20, },
-  drawerContactText: { marginLeft: 8, fontWeight: 'bold', color: Colors.primary },
+  
   emergencyCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.danger + '20', padding: 15, borderRadius: 15, marginTop: 20 },
   emergencyTitle: { fontWeight: 'bold', color: Colors.danger },
   emergencyNumber: { fontSize: 18, color: Colors.text, fontWeight: 'bold' },
   callNowBtn: { backgroundColor: Colors.danger, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 10 },
   callNowText: { color: '#FFF', fontWeight: 'bold' },
+
+  // --- FILTERS ---
   filterContainer: { flexDirection: 'row', justifyContent: 'center', marginVertical: 15, backgroundColor: Colors.primary + '20', borderRadius: 10, padding: 4 },
   filterButton: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
   filterButtonActive: { backgroundColor: Colors.primary },
   filterButtonText: { fontWeight: 'bold', color: Colors.primary },
   filterButtonTextActive: { color: '#FFF' },
 });
+
