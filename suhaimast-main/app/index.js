@@ -1,15 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import {
-  StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView,
-  Dimensions, StatusBar, FlatList, Image, Platform, Alert,
-  LayoutAnimation, UIManager, Modal, SafeAreaView, Linking, ActivityIndicator, Share
-} from 'react-native';
-import { FontAwesome5, MaterialIcons, Ionicons, Entypo, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { Picker } from '@react-native-picker/picker';
+import { Entypo, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
+import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList, Image,
+  LayoutAnimation,
+  Linking,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Share,
+  StatusBar,
+  StyleSheet, Text,
+  TextInput, TouchableOpacity,
+  UIManager,
+  View
+} from 'react-native';
 
 // --- CONFIGURATION ---
 const { width, height } = Dimensions.get('window');
@@ -1118,3 +1131,4 @@ const styles = StyleSheet.create({
   filterButtonText: { fontWeight: 'bold', color: Colors.primary },
   filterButtonTextActive: { color: '#FFF' },
 });
+
