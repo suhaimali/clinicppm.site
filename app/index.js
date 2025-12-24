@@ -30,7 +30,7 @@ const CARD_WIDTH = (width - 60) / 2;
 const DOCTOR_PHONE = '9895353078';
 const DOCTOR_WHATSAPP_NO = '919895353078';
 const DOCTOR_NAME = 'Dr. Mansoor';
-const CLINIC_ADDRESS = '123 Health St, Wellness City, 12345';
+const CLINIC_ADDRESS = 'Dr.MANSOOR ALI.V.P, MD (PHYSICIAN)\nGeneral Practitioner | Reg No: 35083 | +91 9895353078 | Pathappiriyam\nBOOKING NO: +918606344694';
 const EMERGENCY_CONTACT = '112';
 
 // Enable LayoutAnimation
@@ -152,25 +152,29 @@ export default function App() {
         setProcedures(prev => [...proceduresToAdd, ...prev]);
       }
       const appointmentToRemove = appointments.find(a => a.patientName === p?.name && a.status === 'Pending');
-      if (appointmentToRemove) { setAppointments(appointments.filter(a => a.id !== appointmentToRemove.id)); Alert.alert("Success", `Prescription Saved & Appointment for ${p.name} marked as complete.`); }
-      else { Alert.alert("Success", "Prescription Saved Successfully!"); }
+      if (appointmentToRemove) { 
+        setAppointments(appointments.filter(a => a.id !== appointmentToRemove.id)); 
+        Toast.show({ type: 'success', text1: 'Prescription Saved', text2: `Appointment for ${p.name} completed.` });
+      } else { 
+        Toast.show({ type: 'success', text1: 'Success', text2: 'Prescription Saved Successfully!' });
+      }
       setIsLoading(false);
       navigate(Screens.RX_HISTORY, p);
     }, 1000);
   };
 
-  const handleDeleteRx = (id) => { Alert.alert("Confirm Delete", "Delete this prescription?", [{ text: "Cancel" }, { text: "Delete", style: 'destructive', onPress: () => { setIsLoading(true); setTimeout(() => { setPrescriptions(prescriptions.filter(x => x.id !== id)); setIsLoading(false); Alert.alert("Deleted", "Prescription removed."); }, 800); } }]); };
-  const handleQuickBook = (patient, time, reason, type) => { setIsLoading(true); setTimeout(() => { const newAppt = { id: 'appt_' + Date.now(), time: time, patientName: patient.name, type: type, reason: reason, status: 'Pending' }; setAppointments(prev => [...prev, newAppt]); setIsLoading(false); Alert.alert("Success", `Appointment Booked for ${patient.name} at ${time}`); navigate(Screens.DASHBOARD); }, 800); };
-  const handleSaveLab = (l) => { setIsLoading(true); setTimeout(() => { const pName = patients.find(p => p.id === l.patientId)?.name || 'Unknown'; const newLab = { ...l, patientName: pName }; if (l.id) setLabs(labs.map(x => x.id === l.id ? newLab : x)); else setLabs([...labs, { ...newLab, id: Date.now().toString() }]); setIsLoading(false); navigate(Screens.LAB_LIST); }, 1000); };
-  const handleDeleteLab = (id) => { Alert.alert("Delete Report", "Are you sure?", [{ text: "Cancel" }, { text: "Delete", style: 'destructive', onPress: () => setLabs(labs.filter(x => x.id !== id)) }]); };
+  const handleDeleteRx = (id) => { Alert.alert("Confirm Delete", "Delete this prescription?", [{ text: "Cancel" }, { text: "Delete", style: 'destructive', onPress: () => { setIsLoading(true); setTimeout(() => { setPrescriptions(prescriptions.filter(x => x.id !== id)); setIsLoading(false); Toast.show({ type: 'info', text1: 'Deleted', text2: 'Prescription removed.' }); }, 800); } }]); };
+  const handleQuickBook = (patient, time, reason, type) => { setIsLoading(true); setTimeout(() => { const newAppt = { id: 'appt_' + Date.now(), time: time, patientName: patient.name, type: type, reason: reason, status: 'Pending' }; setAppointments(prev => [...prev, newAppt]); setIsLoading(false); Toast.show({ type: 'success', text1: 'Booked!', text2: `Appointment for ${patient.name} at ${time}` }); navigate(Screens.DASHBOARD); }, 800); };
+  const handleSaveLab = (l) => { setIsLoading(true); setTimeout(() => { const pName = patients.find(p => p.id === l.patientId)?.name || 'Unknown'; const newLab = { ...l, patientName: pName }; if (l.id) setLabs(labs.map(x => x.id === l.id ? newLab : x)); else setLabs([...labs, { ...newLab, id: Date.now().toString() }]); setIsLoading(false); Toast.show({ type: 'success', text1: 'Success', text2: 'Lab Report Saved' }); navigate(Screens.LAB_LIST); }, 1000); };
+  const handleDeleteLab = (id) => { Alert.alert("Delete Report", "Are you sure?", [{ text: "Cancel" }, { text: "Delete", style: 'destructive', onPress: () => { setLabs(labs.filter(x => x.id !== id)); Toast.show({ type: 'success', text1: 'Deleted', text2: 'Report removed' }); } }]); };
   const updateInventoryStock = (id, amount) => { setInventory(inventory.map(item => { if (item.id === id) { const newStock = Math.max(0, item.stock + amount); let status = newStock === 0 ? 'Out' : newStock < 10 ? 'Critical' : newStock < 20 ? 'Low' : 'Good'; return { ...item, stock: newStock, status }; } return item; })); };
-  const deleteInventoryItem = (id) => { Alert.alert("Remove Item", "Delete this medicine?", [{ text: "Cancel" }, { text: "Delete", style: 'destructive', onPress: () => setInventory(inventory.filter(i => i.id !== id)) }]); };
-  const addNewMedicine = (name, dosage, strength) => { setIsLoading(true); setTimeout(() => { const newItem = { id: Date.now().toString(), name, dosage, strength, stock: 0, status: 'Out' }; setInventory([...inventory, newItem]); setIsLoading(false); }, 800); };
-  const handleUpdateInventoryItem = (itemId, updatedData) => { setIsLoading(true); setTimeout(() => { setInventory(inventory.map(item => item.id === itemId ? { ...item, ...updatedData } : item)); setIsLoading(false); }, 500); };
-  const handleSaveTemplate = (template) => { setIsLoading(true); setTimeout(() => { if (template.id) { setRxTemplates(rxTemplates.map(t => t.id === template.id ? template : t)); Alert.alert("Success", "Template updated!"); } else { const newTemplate = { ...template, id: 'template_' + Date.now() }; setRxTemplates([...rxTemplates, newTemplate]); Alert.alert("Success", "New template saved!"); } setIsLoading(false); navigate(Screens.TEMPLATE_MANAGER); }, 800); };
-  const handleDeleteTemplate = (id) => { if (id === 'template-none') { Alert.alert("Cannot Delete", "The 'None' template cannot be removed."); return; } Alert.alert("Delete Template", "Are you sure?", [{ text: "Cancel" }, { text: "Delete", style: "destructive", onPress: () => { setRxTemplates(rxTemplates.filter(t => t.id !== id)); } }]); };
-  const handleSaveProcedure = (proc) => { setIsLoading(true); setTimeout(() => { const patientName = patients.find(p => p.id === proc.patientId)?.name || 'Unknown'; const newProc = { ...proc, patientName }; if (proc.id) { setProcedures(procedures.map(p => p.id === proc.id ? newProc : p)); Alert.alert("Success", "Procedure record updated!"); } else { setProcedures(prev => [{ ...newProc, id: 'proc_' + Date.now() }, ...prev]); Alert.alert("Success", "New procedure recorded!"); } setIsLoading(false); navigate(Screens.PROCEDURES_HISTORY); }, 800); };
-  const handleDeleteProcedure = (id) => { Alert.alert("Delete Procedure", "Are you sure you want to remove this record?", [{ text: "Cancel" }, { text: "Delete", style: "destructive", onPress: () => { setProcedures(procedures.filter(p => p.id !== id)); } }]); };
+  const deleteInventoryItem = (id) => { Alert.alert("Remove Item", "Delete this medicine?", [{ text: "Cancel" }, { text: "Delete", style: 'destructive', onPress: () => { setInventory(inventory.filter(i => i.id !== id)); Toast.show({ type: 'info', text1: 'Deleted', text2: 'Item removed from inventory.' }); } }]); };
+  const addNewMedicine = (name, dosage, strength) => { setIsLoading(true); setTimeout(() => { const newItem = { id: Date.now().toString(), name, dosage, strength, stock: 0, status: 'Out' }; setInventory([...inventory, newItem]); setIsLoading(false); Toast.show({ type: 'success', text1: 'Added', text2: `${name} added to inventory` }); }, 800); };
+  const handleUpdateInventoryItem = (itemId, updatedData) => { setIsLoading(true); setTimeout(() => { setInventory(inventory.map(item => item.id === itemId ? { ...item, ...updatedData } : item)); setIsLoading(false); Toast.show({ type: 'success', text1: 'Updated', text2: 'Medicine details updated' }); }, 500); };
+  const handleSaveTemplate = (template) => { setIsLoading(true); setTimeout(() => { if (template.id) { setRxTemplates(rxTemplates.map(t => t.id === template.id ? template : t)); Toast.show({ type: 'success', text1: 'Success', text2: 'Template updated!' }); } else { const newTemplate = { ...template, id: 'template_' + Date.now() }; setRxTemplates([...rxTemplates, newTemplate]); Toast.show({ type: 'success', text1: 'Success', text2: 'New template saved!' }); } setIsLoading(false); navigate(Screens.TEMPLATE_MANAGER); }, 800); };
+  const handleDeleteTemplate = (id) => { if (id === 'template-none') { Toast.show({ type: 'error', text1: 'Cannot Delete', text2: "The 'None' template cannot be removed." }); return; } Alert.alert("Delete Template", "Are you sure?", [{ text: "Cancel" }, { text: "Delete", style: "destructive", onPress: () => { setRxTemplates(rxTemplates.filter(t => t.id !== id)); Toast.show({ type: 'success', text1: 'Deleted', text2: 'Template removed.' }); } }]); };
+  const handleSaveProcedure = (proc) => { setIsLoading(true); setTimeout(() => { const patientName = patients.find(p => p.id === proc.patientId)?.name || 'Unknown'; const newProc = { ...proc, patientName }; if (proc.id) { setProcedures(procedures.map(p => p.id === proc.id ? newProc : p)); Toast.show({ type: 'success', text1: 'Success', text2: 'Procedure record updated!' }); } else { setProcedures(prev => [{ ...newProc, id: 'proc_' + Date.now() }, ...prev]); Toast.show({ type: 'success', text1: 'Success', text2: 'New procedure recorded!' }); } setIsLoading(false); navigate(Screens.PROCEDURES_HISTORY); }, 800); };
+  const handleDeleteProcedure = (id) => { Alert.alert("Delete Procedure", "Are you sure you want to remove this record?", [{ text: "Cancel" }, { text: "Delete", style: "destructive", onPress: () => { setProcedures(procedures.filter(p => p.id !== id)); Toast.show({ type: 'info', text1: 'Deleted', text2: 'Procedure record removed.' }); } }]); };
 
   const renderContent = () => {
     switch (currentScreen) {
@@ -233,6 +237,7 @@ export default function App() {
           </View>
         </View>
       )}
+      <Toast />
     </SafeAreaView>
   );
 }
@@ -685,15 +690,7 @@ const PatientList = ({ patients, navigate, onDelete, onEdit, onBook }) => {
 
 const PatientDetails = ({ patient, labs, navigate }) => {
   if (!patient) return null;
-  const handleShareID = async () => {
-    try {
-      await Share.share({
-        message: `*MEDICAL ID CARD*\nName: ${patient.name}\nID: ${patient.id}\nGender: ${patient.gender}\nAge: ${patient.age}\nBlood: ${patient.blood}\nPhone: ${patient.phone}`,
-      });
-    } catch (error) {
-      Alert.alert("Share Error", error.message);
-    }
-  };
+  const handleShareID = async () => { try { await Share.share({ message: `*MEDICAL ID CARD*\nName: ${patient.name}\nID: ${patient.id}\nGender: ${patient.gender}\nAge: ${patient.age}\nBlood: ${patient.blood}\nPhone: ${patient.phone}`, }); } catch (error) { Toast.show({ type: 'error', text1: 'Share Error', text2: error.message }); } };
   return (<View style={styles.screenContainer}><Header title="Patient Profile" onBack={() => navigate(Screens.PATIENT_LIST)} /><ScrollView contentContainerStyle={{ padding: 20 }}><View style={styles.idCard}><View style={styles.idTop}><Text style={styles.idTitle}>MEDICAL ID CARD</Text><TouchableOpacity onPress={handleShareID}><FontAwesome5 name="share-alt" size={20} color="#FFF" /></TouchableOpacity></View><View style={styles.idContent}><Image source={{ uri: patient.image || 'https://via.placeholder.com/100' }} style={styles.idPhoto} /><View style={{ marginLeft: 15, flex: 1 }}><Text style={styles.idName}>{patient.name}</Text><Text style={styles.idRow}><Text>ID: {patient.id}</Text></Text><Text style={styles.idRow}><Text>{patient.gender}, {patient.age} Yrs</Text></Text><Text style={styles.idRow}><Text>Ph: {patient.phone}</Text></Text><Text style={styles.idRow}><Text>Blood: {patient.blood}</Text></Text></View></View></View><Text style={styles.sectionTitle}>Vitals</Text><View style={styles.vitalGrid}><VitalBox label="HR" val={patient.vitals.hr} unit="bpm" icon="heartbeat" color={Colors.danger} /><VitalBox label="BP" val={patient.vitals.bp} unit="" icon="tint" color={Colors.action} /><VitalBox label="Temp" val={patient.vitals.temp} unit="F" icon="thermometer-half" color={Colors.warning} /></View><View style={[styles.vitalGrid, { marginTop: 10 }]}><VitalBox label="SpO2" val={patient.vitals.spo2} unit="%" icon="lungs" color={Colors.success} /><VitalBox label="Weight" val={patient.vitals.weight} unit="kg" icon="weight" color={Colors.primary} /><TouchableOpacity style={[styles.vitalCard, { borderTopColor: Colors.dash4, justifyContent: 'center' }]} onPress={() => navigate(Screens.RX_HISTORY, patient)}><FontAwesome5 name="prescription-bottle-alt" size={20} color={Colors.dash4} /><Text style={{ fontSize: 12, fontWeight: 'bold', color: Colors.dash4, marginTop: 5 }}>Rx History</Text></TouchableOpacity></View><Text style={styles.sectionTitle}>Lab Reports</Text><View style={{ backgroundColor: Colors.card, borderRadius: 15, padding: 15, elevation: 2 }}>{labs.filter(l => l.patientId === patient.id).length > 0 ? (labs.filter(l => l.patientId === patient.id).map(l => (<Text key={l.id} style={{ marginBottom: 5, color: Colors.text }}>{l.date} - {l.testName}</Text>))) : (<Text style={{ color: Colors.subText, fontStyle: 'italic' }}>No lab reports on file.</Text>)}<TouchableOpacity style={[styles.btnPrimary, { marginTop: 15, padding: 10 }]} onPress={() => navigate(Screens.ADD_LAB, { patientId: patient.id, patientName: patient.name })}><Text style={[styles.btnText, { fontSize: 14 }]}>ADD NEW REPORT</Text></TouchableOpacity></View></ScrollView></View>);
 };
 
@@ -704,23 +701,68 @@ const PatientForm = ({ initialData, onSave, onCancel }) => {
 
 const LabList = ({ labs, navigate, onDelete, onEdit }) => {
   const [viewImage, setViewImage] = useState(null);
-  return (<View style={styles.screenContainer}><Header title="Lab Reports" onBack={() => navigate(Screens.DASHBOARD)} onAdd={() => navigate(Screens.ADD_LAB)} /><FlatList data={labs} keyExtractor={i => i.id} contentContainerStyle={{ padding: 20 }} renderItem={({ item }) => (<View key={item.id} style={styles.card}><View style={styles.row}><TouchableOpacity style={styles.labThumb} onPress={() => item.image && setViewImage(item.image)}>{item.image ? <Image source={{ uri: item.image }} style={{ width: '100%', height: '100%', borderRadius: 10 }} /> : <FontAwesome5 name="file-medical" size={24} color={Colors.primary} />}</TouchableOpacity><View style={{ flex: 1, marginLeft: 15 }}><Text style={styles.cardTitle}>{item.testName}</Text><Text style={styles.cardSub}>{item.patientName}</Text><Text style={styles.cardSub}><FontAwesome5 name="clipboard-list" size={10} color={Colors.subText} /> <Text>{item.labNote}</Text></Text></View><TouchableOpacity onPress={() => item.image ? setViewImage(item.image) : Alert.alert("No Proof", "No image uploaded")} style={styles.iconBtn}><FontAwesome5 name="eye" size={14} color={Colors.action} /></TouchableOpacity><TouchableOpacity onPress={() => onEdit(item)} style={[styles.iconBtn, { marginLeft: 5 }]}><FontAwesome5 name="pen" size={14} color={Colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => onDelete(item.id)} style={[styles.iconBtn, { marginLeft: 5 }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity></View></View>)} /><Modal visible={!!viewImage} transparent={true}><View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}><TouchableOpacity style={{ position: 'absolute', top: 40, right: 20, zIndex: 10 }} onPress={() => setViewImage(null)}><Ionicons name="close-circle" size={40} color="#FFF" /></TouchableOpacity>{viewImage && <Image source={{ uri: viewImage }} style={{ width: width, height: height * 0.8, resizeMode: 'contain' }} />}</View></Modal></View>);
+  return (
+    <View style={styles.screenContainer}>
+      <Header title="Lab Reports" onBack={() => navigate(Screens.DASHBOARD)} onAdd={() => navigate(Screens.ADD_LAB)} />
+      <FlatList data={labs} keyExtractor={i => i.id} contentContainerStyle={{ padding: 20 }} renderItem={({ item }) => (
+        <View key={item.id} style={styles.card}>
+          <View style={styles.row}>
+            <TouchableOpacity style={styles.labThumb} onPress={() => item.image && setViewImage(item.image)}>
+              {item.image ? <Image source={{ uri: item.image }} style={{ width: '100%', height: '100%', borderRadius: 10 }} /> : <FontAwesome5 name="file-medical" size={24} color={Colors.primary} />}
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 15 }}>
+              <Text style={styles.cardTitle}>{item.testName}</Text>
+              <Text style={styles.cardSub}>{item.patientName}</Text>
+              <Text style={styles.cardSub}><FontAwesome5 name="clipboard-list" size={10} color={Colors.subText} /> <Text>{item.labNote}</Text></Text>
+            </View>
+            <TouchableOpacity onPress={() => item.image ? setViewImage(item.image) : Toast.show({ type: 'info', text1: 'No Proof', text2: "No image uploaded." })} style={styles.iconBtn}><FontAwesome5 name="eye" size={14} color={Colors.action} /></TouchableOpacity>
+            <TouchableOpacity onPress={() => onEdit(item)} style={[styles.iconBtn, { marginLeft: 5 }]}><FontAwesome5 name="pen" size={14} color={Colors.primary} /></TouchableOpacity>
+            <TouchableOpacity onPress={() => onDelete(item.id)} style={[styles.iconBtn, { marginLeft: 5 }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity>
+          </View>
+        </View>
+      )} />
+      <Modal visible={!!viewImage} transparent={true}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity style={{ position: 'absolute', top: 40, right: 20, zIndex: 10 }} onPress={() => setViewImage(null)}><Ionicons name="close-circle" size={40} color="#FFF" /></TouchableOpacity>
+          {viewImage && <Image source={{ uri: viewImage }} style={{ width: width, height: height * 0.8, resizeMode: 'contain' }} />}
+        </View>
+      </Modal>
+    </View>
+  );
 };
 
 const LabForm = ({ initialData, patients, onSave, onCancel }) => {
-  const [form, setForm] = useState(initialData || { patientId: patients[0]?.id, testName: '', date: new Date().toLocaleDateString(), image: null, labNote: '' }); const pickProof = async () => { let r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 }); if (!r.canceled) setForm({ ...form, image: r.assets[0].uri }); };
-  return (<View style={styles.screenContainer}><Header title={initialData ? "Edit Report" : "Upload Report"} onBack={onCancel} /><ScrollView contentContainerStyle={{ padding: 20 }}><Text style={styles.label}>Select Patient</Text><View style={styles.inputBox}><Picker selectedValue={form.patientId} onValueChange={v => setForm({ ...form, patientId: v })}>{patients.map(p => <Picker.Item key={p.id} label={p.name} value={p.id} />)}</Picker></View><Input label="Test Name" placeholder="e.g. Blood Test, USG KUB" value={form.testName} onChange={t => setForm({ ...form, testName: t })} /><Input label="Lab Note / Result Detail" placeholder="e.g. 220 mg/dL" value={form.labNote} onChange={t => setForm({ ...form, labNote: t })} /><Text style={styles.label}>Upload Proof (Image)</Text><TouchableOpacity style={styles.imagePicker} onPress={pickProof}>{form.image ? <Image source={{ uri: form.image }} style={{ width: '100%', height: '100%', borderRadius: 10 }} /> : <View style={{ alignItems: 'center' }}><FontAwesome5 name="cloud-upload-alt" size={30} color={Colors.subText} /><Text style={{ color: Colors.subText, marginTop: 5 }}>Click to Upload</Text></View>}</TouchableOpacity><TouchableOpacity style={styles.btnPrimary} onPress={() => onSave(form)}><Text style={styles.btnText}>SAVE REPORT</Text></TouchableOpacity></ScrollView></View>);
+  const [form, setForm] = useState(initialData || { patientId: patients[0]?.id, testName: '', date: new Date().toLocaleDateString(), image: null, labNote: '' });
+  const pickProof = async () => { let r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 }); if (!r.canceled) setForm({ ...form, image: r.assets[0].uri }); };
+  return (
+    <View style={styles.screenContainer}>
+      <Header title={initialData ? "Edit Report" : "Upload Report"} onBack={onCancel} />
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        <Text style={styles.label}>Select Patient</Text>
+        <View style={styles.inputBox}>
+          <Picker selectedValue={form.patientId} onValueChange={v => setForm({ ...form, patientId: v })}>{patients.map(p => <Picker.Item key={p.id} label={p.name} value={p.id} />)}</Picker>
+        </View>
+        <Input label="Test Name" placeholder="e.g. Blood Test, USG KUB" value={form.testName} onChange={t => setForm({ ...form, testName: t })} />
+        <Input label="Lab Note / Result Detail" placeholder="e.g. 220 mg/dL" value={form.labNote} onChange={t => setForm({ ...form, labNote: t })} />
+        <Text style={styles.label}>Upload Proof (Image)</Text>
+        <TouchableOpacity style={styles.imagePicker} onPress={pickProof}>
+          {form.image ? <Image source={{ uri: form.image }} style={{ width: '100%', height: '100%', borderRadius: 10 }} /> : <View style={{ alignItems: 'center' }}><FontAwesome5 name="cloud-upload-alt" size={30} color={Colors.subText} /><Text style={{ color: Colors.subText, marginTop: 5 }}>Click to Upload</Text></View>}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnPrimary} onPress={() => onSave(form)}><Text style={styles.btnText}>SAVE REPORT</Text></TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
 };
 
 const InventoryScreen = ({ inventory, onUpdateStock, onAddItem, onDeleteItem, onUpdateItem, navigate }) => {
   const [medName, setMedName] = useState(''); const [dosageForm, setDosageForm] = useState('Tablet'); const [strength, setStrength] = useState(''); const [isAdding, setIsAdding] = useState(false); const [editingItem, setEditingItem] = useState(null);
   const DOSAGE_FORMS = ['Tablet', 'Capsule', 'Syrup', 'Injection', 'Ointment', 'Drops', 'Piece'];
-  const handleAdd = () => { if (medName && strength) { onAddItem(medName, dosageForm, strength); setMedName(''); setStrength(''); setIsAdding(false); } else { Alert.alert("Missing Fields", "Please enter Medicine Name and Strength"); } };
+  const handleAdd = () => { if (medName && strength) { onAddItem(medName, dosageForm, strength); setMedName(''); setStrength(''); setIsAdding(false); } else { Toast.show({ type: 'error', text1: "Missing Fields", text2: "Please enter Medicine Name and Strength" }); } };
   const EditInventoryModal = () => {
     const [form, setForm] = useState(editingItem);
     useEffect(() => { setForm(editingItem); }, [editingItem]);
     if (!form) return null;
-    const handleSave = () => { onUpdateItem(form.id, { name: form.name, strength: form.strength, dosage: form.dosage }); setEditingItem(null); }
+    const handleSave = () => { onUpdateItem(form.id, { name: form.name, strength: form.strength, dosage: form.dosage }); setEditingItem(null); };
     return (<Modal visible={!!editingItem} transparent={true} animationType="slide"><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Edit Medicine</Text><Input label="Medicine Name" value={form.name} onChange={t => setForm({ ...form, name: t })} /><Input label="Strength" value={form.strength} onChange={t => setForm({ ...form, strength: t })} /><Text style={styles.label}>Dosage Form</Text><View style={styles.pickerContainer}><Picker selectedValue={form.dosage} onValueChange={v => setForm({ ...form, dosage: v })} >{DOSAGE_FORMS.map(f => <Picker.Item key={f} label={f} value={f} />)}</Picker></View><View style={[styles.row, { marginTop: 20 }]}><TouchableOpacity style={[styles.btnPrimary, { flex: 1, backgroundColor: Colors.subText, marginRight: 10 }]} onPress={() => setEditingItem(null)}><Text style={styles.btnText}>CANCEL</Text></TouchableOpacity><TouchableOpacity style={[styles.btnPrimary, { flex: 1 }]} onPress={handleSave}><Text style={styles.btnText}>SAVE</Text></TouchableOpacity></View></View></View></Modal>);
   };
   return (<View style={styles.screenContainer}><Header title="Inventory" onBack={() => navigate(Screens.DASHBOARD)} onAdd={() => setIsAdding(!isAdding)} /><EditInventoryModal />{isAdding ? (<View style={styles.addItemBox}><Text style={styles.subHeader}>Add New Medicine</Text><Input label="Medicine Name" value={medName} onChange={setMedName} style={{ marginBottom: 10 }} /><View style={styles.row}><View style={{ flex: 1, marginRight: 10 }}><Text style={styles.label}>Dosage Form</Text><View style={styles.pickerContainer}><Picker selectedValue={dosageForm} onValueChange={setDosageForm} style={{ height: 50 }}>{DOSAGE_FORMS.map(f => <Picker.Item key={f} label={f} value={f} />)}</Picker></View></View><Input style={{ flex: 1 }} label="Strength" value={strength} onChange={setStrength} /></View><TouchableOpacity style={styles.btnSmall} onPress={handleAdd}><Text style={{ color: '#FFF', fontWeight: 'bold' }}>ADD MEDICINE</Text></TouchableOpacity></View>) : null}<FlatList data={inventory} keyExtractor={item => item.id} contentContainerStyle={{ padding: 20 }} renderItem={({ item }) => (<View key={item.id} style={styles.invCard}><View style={styles.invIconBox}><FontAwesome5 name="pills" size={20} color={Colors.primary} /></View><View style={{ flex: 1, marginLeft: 10 }}><Text style={styles.invName}>{item.name} <Text style={styles.invStrength}>{item.strength}</Text></Text><Text style={styles.invUnit}>{item.dosage}</Text><Text style={[styles.stockStatus, { color: item.stock < 10 ? Colors.danger : Colors.success }]}>{item.stock === 0 ? 'Out of Stock' : `${item.stock} in stock`}</Text></View><View style={styles.counterContainer}><TouchableOpacity style={styles.counterBtn} onPress={() => onUpdateStock(item.id, -1)}><Entypo name="minus" size={24} color={Colors.danger} /></TouchableOpacity><TouchableOpacity style={styles.counterBtn} onPress={() => onUpdateStock(item.id, 1)}><Entypo name="plus" size={24} color={Colors.success} /></TouchableOpacity><TouchableOpacity style={[styles.iconBtn, { marginLeft: 10, backgroundColor: Colors.action + '20' }]} onPress={() => setEditingItem(item)}><FontAwesome5 name="pen" size={14} color={Colors.action} /></TouchableOpacity><TouchableOpacity style={[styles.iconBtn, { marginLeft: 5, backgroundColor: Colors.danger + '20' }]} onPress={() => onDeleteItem(item.id)}><FontAwesome5 name="trash-alt" size={14} color={Colors.danger} /></TouchableOpacity></View></View>)} /></View>);
@@ -734,84 +776,68 @@ const PrescriptionHistoryScreen = ({ patient, prescriptions, navigate, onDeleteR
   const filteredPrescriptions = prescriptions.filter(item => item.date >= formattedStartDate && item.date <= formattedEndDate);
   const displayPrescriptions = filterMode === 'recent' ? filteredPrescriptions.slice(0, 10) : filteredPrescriptions;
   const handleExportPdf = async () => {
-    if (filteredPrescriptions.length === 0) { Alert.alert("No Data", "No prescriptions in the selected date range to export."); return; }
+    if (filteredPrescriptions.length === 0) { Toast.show({ type: 'error', text1: "No Data", text2: "No prescriptions in the selected date range to export." }); return; }
     const today = new Date().toLocaleDateString('en-GB');
     const vitalsToHtml = (vitals) => { if (!vitals || Object.keys(vitals).length === 0) return ''; const vitalPills = Object.entries(vitals).map(([key, value]) => { if (!value) return ''; const label = Object.keys(VITAL_KEYS).find(k => VITAL_KEYS[k] === key); return label ? `<div class="vital-pill"><strong>${label}:</strong> ${value}</div>` : ''; }).join(''); return `<h4 class="vitals-header">Vitals Recorded</h4><div class="vitals-container">${vitalPills}</div>`; };
     const proceduresToHtml = (procedures) => { if (!procedures || procedures.length === 0) return ''; const procedureRows = procedures.map(p => `<tr><td>${p.name}</td><td>₹${p.cost}</td></tr>`).join(''); return `<h4 class="medicines-header">Procedures Performed</h4><table><thead><tr><th>Procedure</th><th>Cost (₹)</th></tr></thead><tbody>${procedureRows}</tbody></table>`; };
-
-    const prescriptionsHtml = filteredPrescriptions.map(rx => `
-        <div class="rx-item">
-          <div class="rx-header"><h3>Date: ${new Date(rx.date).toLocaleDateString('en-GB')}</h3><p><strong>Diagnosis:</strong> ${rx.diagnosis}</p></div>
-          <div class="rx-body">
-            ${vitalsToHtml(rx.vitals)}
-            <h4 class="medicines-header">Medicines</h4>
-            <table><thead><tr><th>Medicine</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead><tbody>${rx.medicines.map(med => `<tr><td>${med.name} ${med.strength} (${med.dosage})</td><td>${med.frequency}</td><td>${med.duration}</td><td>${med.instructions || '-'}</td></tr>`).join('')}</tbody></table>
-            ${proceduresToHtml(rx.proceduresPerformed)}
-            ${rx.notes ? `<div class="notes-section"><p><strong>Notes:</strong> ${rx.notes}</p></div>` : ''}
-          </div>
-        </div>`).join('');
+    const prescriptionsHtml = filteredPrescriptions.map(rx => `<div class="rx-item"><div class="rx-header"><h3>Date: ${new Date(rx.date).toLocaleDateString('en-GB')}</h3><p><strong>Diagnosis:</strong> ${rx.diagnosis}</p></div><div class="rx-body">${vitalsToHtml(rx.vitals)}<h4 class="medicines-header">Medicines</h4><table><thead><tr><th>Medicine</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead><tbody>${rx.medicines.map(med => `<tr><td>${med.name} ${med.strength} (${med.dosage})</td><td>${med.frequency}</td><td>${med.duration}</td><td>${med.instructions || '-'}</td></tr>`).join('')}</tbody></table>${proceduresToHtml(rx.proceduresPerformed)}${rx.notes ? `<div class="notes-section"><p><strong>Notes:</strong> ${rx.notes}</p></div>` : ''}</div></div>`).join('');
     const htmlContent = `<html><head><style> @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap'); body { font-family: 'Roboto', Arial, sans-serif; color: #333; margin: 25px; font-size: 12px; } .letterhead { text-align: center; border-bottom: 2px solid ${Colors.primary}; padding-bottom: 10px; margin-bottom: 20px; } .letterhead h1 { color: ${Colors.primaryDark}; margin: 0; } .letterhead p { margin: 2px 0; font-size: 11px; color: ${Colors.subText}; } .patient-info { background-color: ${Colors.bg}; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e0e0e0; } .patient-info p { margin: 4px 0; } .rx-item { border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; page-break-inside: avoid; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; } .rx-header { background-color: ${Colors.primary}1A; color: ${Colors.primaryDark}; padding: 10px 15px; border-bottom: 1px solid #ddd; } .rx-header h3, .rx-header p { margin: 0; } .rx-body { padding: 15px; } .vitals-header, .medicines-header { color: ${Colors.primary}; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; } .vitals-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; } .vital-pill { background-color: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-size: 11px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #e0e0e0; padding: 8px; text-align: left; } th { background-color: #f5f5f5; font-weight: bold; } tbody tr:nth-child(even) { background-color: #f9f9f9; } .notes-section { margin-top: 15px; padding: 10px; background-color: #fffbe6; border: 1px solid #ffe58f; border-radius: 4px; font-style: italic; } .footer { text-align: center; margin-top: 30px; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px; } </style></head><body> <div class="letterhead"><h1>${DOCTOR_NAME}</h1><p>${CLINIC_ADDRESS} | Phone: ${DOCTOR_PHONE}</p></div> <h2>Prescription History</h2> <div class="patient-info"><p><strong>Patient:</strong> ${patient.name}</p><p><strong>Age:</strong> ${patient.age}</p><p><strong>Gender:</strong> ${patient.gender}</p><p><strong>Report Period:</strong> ${formattedStartDate} to ${formattedEndDate}</p></div> ${prescriptionsHtml} <div class="footer"><p>This is a computer-generated report. | Generated on: ${today}</p><p><strong>${DOCTOR_NAME}</strong></p></div> </body></html>`;
-    try { const { uri } = await Print.printToFileAsync({ html: htmlContent }); await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Share Prescription History' }); } catch (error) { Alert.alert("Error", "Could not generate or share PDF."); }
+    try { const { uri } = await Print.printToFileAsync({ html: htmlContent }); await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Share Prescription History' }); } catch (error) { Toast.show({ type: 'error', text1: "Error", text2: "Could not generate or share PDF." }); }
   };
 
   const onDateChange = (event, selectedDate) => { setShowDatePicker(null); if (event.type === 'set' && selectedDate) { if (showDatePicker === 'start') setStartDate(selectedDate); else if (showDatePicker === 'end') setEndDate(selectedDate); } };
   const RxTableItem = ({ item }) => (<View key={item.id} style={styles.rxTableItem}><View style={styles.rxTableCol}><Text style={styles.rxDate}>{item.date}</Text><Text style={styles.rxDiagnosis}>{item.diagnosis}</Text><Text style={{ fontSize: 12, color: Colors.subText }}>{item.medicines.length} Medicine(s) {item.templateName ? <Text>({item.templateName})</Text> : null}</Text></View><View style={{ flexDirection: 'row', alignItems: 'center' }}><TouchableOpacity onPress={() => setViewRx(item)} style={[styles.iconBtn, { backgroundColor: Colors.action + '20' }]}><FontAwesome5 name="eye" size={14} color={Colors.action} /></TouchableOpacity><TouchableOpacity onPress={() => onEditRx(item)} style={[styles.iconBtn, { marginLeft: 5, backgroundColor: Colors.primary + '20' }]}><FontAwesome5 name="pen" size={14} color={Colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => onDeleteRx(item.id)} style={[styles.iconBtn, { marginLeft: 5, backgroundColor: Colors.danger + '20' }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity></View></View>);
 
   return (<View style={styles.screenContainer}><Header title={`Rx History: ${patient.name}`} onBack={() => navigate(Screens.PATIENT_DETAILS, patient)} onAdd={() => navigate(Screens.ADD_RX, patient)} /><ScrollView contentContainerStyle={{ padding: 20 }}><Text style={styles.sectionTitleSmall}>Filter by Date</Text><View style={styles.row}><View style={{ flex: 1, marginRight: 10 }}><Text style={styles.label}>Start Date</Text><TouchableOpacity onPress={() => setShowDatePicker('start')} style={styles.pickerBtnSmall}><Text style={styles.pickerTextSmall}>{formattedStartDate}</Text></TouchableOpacity></View><View style={{ flex: 1 }}><Text style={styles.label}>End Date</Text><TouchableOpacity onPress={() => setShowDatePicker('end')} style={styles.pickerBtnSmall}><Text style={styles.pickerTextSmall}>{formattedEndDate}</Text></TouchableOpacity></View></View><TouchableOpacity style={[styles.btnSmall, { backgroundColor: Colors.action, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]} onPress={handleExportPdf}><FontAwesome5 name="file-pdf" size={14} color="#FFF" style={{ marginRight: 10 }} /><Text style={{ color: '#FFF', fontWeight: 'bold' }}>EXPORT PDF</Text></TouchableOpacity>{showDatePicker ? <DateTimePicker value={showDatePicker === 'start' ? startDate : endDate} mode="date" display="default" onChange={onDateChange} maximumDate={new Date()} /> : null}
-    <View style={styles.filterContainer}>
-      <TouchableOpacity style={[styles.filterButton, filterMode === 'recent' && styles.filterButtonActive]} onPress={() => setFilterMode('recent')}><Text style={[styles.filterButtonText, filterMode === 'recent' && styles.filterButtonTextActive]}>Recent (10)</Text></TouchableOpacity>
-      <TouchableOpacity style={[styles.filterButton, filterMode === 'all' && styles.filterButtonActive]} onPress={() => setFilterMode('all')}><Text style={[styles.filterButtonText, filterMode === 'all' && styles.filterButtonTextActive]}>All (<Text>{filteredPrescriptions.length}</Text>)</Text></TouchableOpacity>
-    </View>
+    <View style={styles.filterContainer}><TouchableOpacity style={[styles.filterButton, filterMode === 'recent' && styles.filterButtonActive]} onPress={() => setFilterMode('recent')}><Text style={[styles.filterButtonText, filterMode === 'recent' && styles.filterButtonTextActive]}>Recent (10)</Text></TouchableOpacity><TouchableOpacity style={[styles.filterButton, filterMode === 'all' && styles.filterButtonActive]} onPress={() => setFilterMode('all')}><Text style={[styles.filterButtonText, filterMode === 'all' && styles.filterButtonTextActive]}>All (<Text>{filteredPrescriptions.length}</Text>)</Text></TouchableOpacity></View>
     <Text style={styles.sectionTitle}>Prescription History (<Text>{displayPrescriptions.length}</Text>)</Text>
     {displayPrescriptions.length === 0 ? (<View style={styles.emptyState}><FontAwesome5 name="folder-open" size={50} color={Colors.subText} /><Text style={styles.emptyText}>No prescriptions found.</Text></View>) : (<View style={styles.rxTable}><View style={styles.rxTableHeader}><Text style={styles.rxHeaderCol}>Date/Diagnosis</Text><Text style={{ width: 120, textAlign: 'right', fontWeight: 'bold', color: Colors.text }}>Actions</Text></View>{displayPrescriptions.map(item => <RxTableItem key={item.id} item={item} />)}</View>)}</ScrollView><PrescriptionDetailModal rx={viewRx} onClose={() => setViewRx(null)} /></View>);
 };
 
+const AllPrescriptionHistoryScreen = ({ allPrescriptions, patients, navigate, onDeleteRx }) => {
+  const [viewRx, setViewRx] = useState(null); const [startDate, setStartDate] = useState(new Date('2023-01-01')); const [endDate, setEndDate] = useState(new Date()); const [showDatePicker, setShowDatePicker] = useState(null); const [filterMode, setFilterMode] = useState('recent'); const [searchText, setSearchText] = useState('');
+  const formattedStartDate = startDate.toLocaleDateString('en-CA');
+  const formattedEndDate = endDate.toLocaleDateString('en-CA');
+  const filteredPrescriptions = allPrescriptions.filter(item => { const inDateRange = item.date >= formattedStartDate && item.date <= formattedEndDate; const matchesSearch = item.patientName.toLowerCase().includes(searchText.toLowerCase()) || item.diagnosis.toLowerCase().includes(searchText.toLowerCase()); return inDateRange && matchesSearch; });
+  const displayPrescriptions = filterMode === 'recent' ? filteredPrescriptions.slice(0, 20) : filteredPrescriptions;
+  const onDateChange = (event, selectedDate) => { setShowDatePicker(null); if (event.type === 'set' && selectedDate) { if (showDatePicker === 'start') setStartDate(selectedDate); else if (showDatePicker === 'end') setEndDate(selectedDate); } };
+  const RxTableItem = ({ item }) => (<View key={item.id} style={styles.rxTableItem}><View style={styles.rxTableCol}><Text style={[styles.rxDate, {fontWeight:'bold', color:Colors.primary}]}>{item.patientName}</Text><Text style={styles.rxDate}>{item.date}</Text><Text style={styles.rxDiagnosis}>{item.diagnosis}</Text><Text style={{ fontSize: 12, color: Colors.subText }}>{item.medicines.length} Meds</Text></View><View style={{ flexDirection: 'row', alignItems: 'center' }}><TouchableOpacity onPress={() => setViewRx(item)} style={[styles.iconBtn, { backgroundColor: Colors.action + '20' }]}><FontAwesome5 name="eye" size={14} color={Colors.action} /></TouchableOpacity><TouchableOpacity onPress={() => onDeleteRx(item.id)} style={[styles.iconBtn, { marginLeft: 5, backgroundColor: Colors.danger + '20' }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity></View></View>);
+  return (
+    <View style={styles.screenContainer}>
+      <Header title="All Prescriptions" onBack={() => navigate(Screens.DASHBOARD)} />
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        <View style={styles.searchContainer}><Ionicons name="search" size={20} color={Colors.subText} /><TextInput style={styles.searchInput} placeholder="Search Patient or Diagnosis..." value={searchText} onChangeText={setSearchText} /></View>
+        <Text style={styles.sectionTitleSmall}>Filter by Date</Text>
+        <View style={styles.row}><View style={{ flex: 1, marginRight: 10 }}><Text style={styles.label}>Start Date</Text><TouchableOpacity onPress={() => setShowDatePicker('start')} style={styles.pickerBtnSmall}><Text style={styles.pickerTextSmall}>{formattedStartDate}</Text></TouchableOpacity></View><View style={{ flex: 1 }}><Text style={styles.label}>End Date</Text><TouchableOpacity onPress={() => setShowDatePicker('end')} style={styles.pickerBtnSmall}><Text style={styles.pickerTextSmall}>{formattedEndDate}</Text></TouchableOpacity></View></View>
+        {showDatePicker && (<DateTimePicker value={showDatePicker === 'start' ? startDate : endDate} mode="date" display="default" onChange={onDateChange} maximumDate={new Date()} />)}
+        <View style={styles.filterContainer}><TouchableOpacity style={[styles.filterButton, filterMode === 'recent' && styles.filterButtonActive]} onPress={() => setFilterMode('recent')}><Text style={[styles.filterButtonText, filterMode === 'recent' && styles.filterButtonTextActive]}>Recent (20)</Text></TouchableOpacity><TouchableOpacity style={[styles.filterButton, filterMode === 'all' && styles.filterButtonActive]} onPress={() => setFilterMode('all')}><Text style={[styles.filterButtonText, filterMode === 'all' && styles.filterButtonTextActive]}>All ({filteredPrescriptions.length})</Text></TouchableOpacity></View>
+        <Text style={styles.sectionTitle}>Records Found: {displayPrescriptions.length}</Text>
+        {displayPrescriptions.length === 0 ? (<View style={styles.emptyState}><FontAwesome5 name="folder-open" size={50} color={Colors.subText} /><Text style={styles.emptyText}>No records found.</Text></View>) : (<View style={styles.rxTable}>{displayPrescriptions.map(item => <RxTableItem key={item.id} item={item} />)}</View>)}
+      </ScrollView>
+      <PrescriptionDetailModal rx={viewRx} onClose={() => setViewRx(null)} />
+    </View>
+  );
+};
+
 const NewPrescriptionForm = ({ patient, inventory, templates, onSave, onCancel, initialData }) => {
-  const isEdit = !!initialData;
-  const medicineNames = [...new Set(inventory.map(i => i.name))];
-  const dosageForms = [...new Set(inventory.map(i => i.dosage))];
+  const isEdit = !!initialData; const medicineNames = [...new Set(inventory.map(i => i.name))]; const dosageForms = [...new Set(inventory.map(i => i.dosage))];
   const [rxData, setRxData] = useState(initialData ? { ...initialData, vitals: initialData.vitals || patient.vitals || {}, templateId: initialData.templateId || 'template-none', proceduresPerformed: initialData.proceduresPerformed || [] } : { patientId: patient.id, diagnosis: '', notes: '', isTapering: false, vitals: patient?.vitals || {}, medicines: [], proceduresPerformed: [], templateId: 'template-none', });
   const [currentMed, setCurrentMed] = useState({ name: medicineNames[0] || '', strength: '', dosage: dosageForms[0] || 'Tablet', frequency: FREQUENCY_OPTIONS[0], duration: DURATION_OPTIONS[0], instructions: '' });
   const [currentProc, setCurrentProc] = useState({ name: '', cost: '' });
-
   useEffect(() => { if (isEdit) return; const selectedTemplate = templates.find(t => t.id === rxData.templateId); if (selectedTemplate && selectedTemplate.id !== 'template-none') { setRxData(prev => ({ ...prev, diagnosis: selectedTemplate.diagnosis, medicines: selectedTemplate.medicines.map(m => ({ ...m, id: 'med_' + Date.now() + Math.random() })) })); } else if (selectedTemplate && selectedTemplate.id === 'template-none') { setRxData(prev => ({ ...prev, diagnosis: '', medicines: [] })); } }, [rxData.templateId, templates, isEdit]);
-
   const VitalInputRx = ({ label, unit, kbd = 'default', style }) => {
-    const key = VITAL_KEYS[label];
-    const value = rxData.vitals[key] || '';
+    const key = VITAL_KEYS[label]; const value = rxData.vitals[key] || '';
     const handleChange = (t) => { const cleanedText = key === 'bp' ? t.replace(/[^0-9\/]/g, '') : t.replace(/[^0-9\.]/g, ''); setRxData(prev => ({ ...prev, vitals: { ...prev.vitals, [key]: cleanedText } })); };
-    return (
-      <View style={[{ marginBottom: 15, flex: 1 }, style]}>
-        <Text style={styles.label}>{label} {unit ? <Text>({unit})</Text> : null}</Text>
-        <View style={styles.inputBoxRx}>
-          <TextInput style={{ flex: 1, padding: 0, fontSize: 16 }} value={value} onChangeText={handleChange} keyboardType={kbd} />
-          {unit ? <Text style={{ color: Colors.subText, marginLeft: 5 }}>{unit}</Text> : null}
-        </View>
-      </View>
-    );
+    return (<View style={[{ marginBottom: 15, flex: 1 }, style]}><Text style={styles.label}>{label} {unit ? <Text>({unit})</Text> : null}</Text><View style={styles.inputBoxRx}><TextInput style={{ flex: 1, padding: 0, fontSize: 16 }} value={value} onChangeText={handleChange} keyboardType={kbd} />{unit ? <Text style={{ color: Colors.subText, marginLeft: 5 }}>{unit}</Text> : null}</View></View>);
   };
-
-  const handleAddMedicine = () => {
-    if (!currentMed.name || !currentMed.strength) { Alert.alert("Missing Fields", "Please enter Medicine Name and Strength."); return; }
-    const newMed = { ...currentMed, id: 'med_' + Date.now() + Math.random() };
-    setRxData(prev => ({ ...prev, medicines: [...prev.medicines, newMed] }));
-    setCurrentMed({ name: medicineNames[0] || '', strength: '', dosage: dosageForms[0] || 'Tablet', frequency: FREQUENCY_OPTIONS[0], duration: DURATION_OPTIONS[0], instructions: '' });
-  };
+  const handleAddMedicine = () => { if (!currentMed.name || !currentMed.strength) { Toast.show({ type: 'error', text1: "Missing Fields", text2: "Please enter Medicine Name and Strength." }); return; } const newMed = { ...currentMed, id: 'med_' + Date.now() + Math.random() }; setRxData(prev => ({ ...prev, medicines: [...prev.medicines, newMed] })); setCurrentMed({ name: medicineNames[0] || '', strength: '', dosage: dosageForms[0] || 'Tablet', frequency: FREQUENCY_OPTIONS[0], duration: DURATION_OPTIONS[0], instructions: '' }); };
   const handleRemoveMedicine = (id) => { setRxData(prev => ({ ...prev, medicines: prev.medicines.filter(m => m.id !== id) })); };
-  const handleAddProcedure = () => {
-    if (!currentProc.name || !currentProc.cost) { Alert.alert("Missing Fields", "Please enter Procedure Name and Cost."); return; }
-    setRxData(prev => ({ ...prev, proceduresPerformed: [...prev.proceduresPerformed, { ...currentProc, id: 'proc_' + Date.now() + Math.random() }] }));
-    setCurrentProc({ name: '', cost: '' });
-  };
+  const handleAddProcedure = () => { if (!currentProc.name || !currentProc.cost) { Toast.show({ type: 'error', text1: "Missing Fields", text2: "Please enter Procedure Name and Cost." }); return; } setRxData(prev => ({ ...prev, proceduresPerformed: [...prev.proceduresPerformed, { ...currentProc, id: 'proc_' + Date.now() + Math.random() }] })); setCurrentProc({ name: '', cost: '' }); };
   const handleRemoveProcedure = (id) => { setRxData(prev => ({ ...prev, proceduresPerformed: prev.proceduresPerformed.filter(p => p.id !== id) })); };
-  const handleFinalSave = () => { if (!rxData.diagnosis || rxData.medicines.length === 0) { Alert.alert("Incomplete Data", "Please enter a diagnosis and at least one medicine."); return; } const selectedTemplate = templates.find(t => t.id === rxData.templateId); onSave({ ...rxData, templateName: selectedTemplate?.name || 'Custom' }); };
-
+  const handleFinalSave = () => { if (!rxData.diagnosis || rxData.medicines.length === 0) { Toast.show({ type: 'error', text1: "Incomplete Data", text2: "Please enter a diagnosis and at least one medicine." }); return; } const selectedTemplate = templates.find(t => t.id === rxData.templateId); onSave({ ...rxData, templateName: selectedTemplate?.name || 'Custom' }); };
   return (<View style={styles.screenContainer}><Header title={`${isEdit ? 'Edit' : 'New'} Rx: ${patient.name}`} onBack={onCancel} /><ScrollView contentContainerStyle={{ padding: 20 }}><Text style={styles.sectionTitle}>Vitals (Latest)</Text><View style={styles.row}><VitalInputRx label="SpO2" unit="%" kbd="numeric" style={{ marginRight: 10 }} /><VitalInputRx label="BP" unit="mmHg" /></View><View style={styles.row}><VitalInputRx label="HR" unit="bpm" kbd="numeric" style={{ marginRight: 10 }} /><VitalInputRx label="Temp" unit="°F" kbd="numeric" /></View><VitalInputRx label="Weight" unit="kg" kbd="numeric" /><Text style={styles.sectionTitle}>Template & Notes</Text><Text style={styles.label}>Select Template</Text><View style={styles.pickerContainer}><Picker selectedValue={rxData.templateId} onValueChange={(v) => setRxData({ ...rxData, templateId: v })}>{templates.map(t => <Picker.Item key={t.id} label={t.name} value={t.id} />)}</Picker></View><Input label="Diagnosis" placeholder="e.g., UROLITHIASIS" value={rxData.diagnosis} onChange={(t) => setRxData({ ...rxData, diagnosis: t })} /><Input label="Doctor's Notes/Additional Instructions" value={rxData.notes} onChange={(t) => setRxData({ ...rxData, notes: t })} multiline={true} style={{ marginBottom: 20 }} />
-
     <Text style={styles.sectionTitle}>Prescribed Medicines (<Text>{rxData.medicines.length}</Text>)</Text>{rxData.medicines.map((med) => (<View key={med.id} style={styles.medCard}><View style={{ flex: 1 }}><Text style={styles.medName}>{med.name} - {med.strength}</Text><Text style={styles.medDetails}>{med.dosage} | {med.frequency} for {med.duration}</Text><Text style={styles.medInstructions}><FontAwesome5 name="clipboard" size={10} color={Colors.subText} /> <Text>{med.instructions}</Text></Text></View><TouchableOpacity onPress={() => handleRemoveMedicine(med.id)} style={[styles.iconBtn, { backgroundColor: Colors.danger + '20' }]}><FontAwesome5 name="trash-alt" size={14} color={Colors.danger} /></TouchableOpacity></View>))}<View style={[styles.addItemBox, { marginTop: 10 }]}><Text style={styles.subHeader}>Add New Medicine</Text><Text style={styles.label}>Medicine Name</Text><View style={styles.pickerContainer}><Picker selectedValue={currentMed.name} onValueChange={(v) => setCurrentMed({ ...currentMed, name: v })}>{medicineNames.map(name => <Picker.Item key={name} label={name} value={name} />)}</Picker></View><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="Strength" placeholder="e.g., 500mg" value={currentMed.strength} onChange={(t) => setCurrentMed({ ...currentMed, strength: t })} /><View style={{ flex: 1 }}><Text style={styles.label}>Dosage Form</Text><View style={styles.pickerContainer}><Picker selectedValue={currentMed.dosage} onValueChange={(v) => setCurrentMed({ ...currentMed, dosage: v })} style={{ height: 40 }}>{dosageForms.map(f => <Picker.Item key={f} label={f} value={f} />)}</Picker></View></View></View><View style={styles.row}><View style={{ flex: 1, marginRight: 10 }}><Text style={styles.label}>Frequency</Text><View style={styles.pickerContainer}><Picker selectedValue={currentMed.frequency} onValueChange={(v) => setCurrentMed({ ...currentMed, frequency: v })} style={{ height: 40 }}>{FREQUENCY_OPTIONS.map(f => <Picker.Item key={f} label={f} value={f} />)}</Picker></View></View><View style={{ flex: 1 }}><Text style={styles.label}>Duration</Text><View style={styles.pickerContainer}><Picker selectedValue={currentMed.duration} onValueChange={(v) => setCurrentMed({ ...currentMed, duration: v })} style={{ height: 40 }}>{DURATION_OPTIONS.map(d => <Picker.Item key={d} label={d} value={d} />)}</Picker></View></View></View><Input label="Specific Instructions" placeholder="e.g., After food" value={currentMed.instructions} onChange={(t) => setCurrentMed({ ...currentMed, instructions: t })} /><TouchableOpacity style={[styles.btnSmall, { backgroundColor: Colors.action }]} onPress={handleAddMedicine}><Text style={{ color: '#FFF', fontWeight: 'bold' }}>ADD TO PRESCRIPTION</Text></TouchableOpacity></View>
-
     <Text style={styles.sectionTitle}>Procedures Performed (<Text>{rxData.proceduresPerformed.length}</Text>)</Text>{rxData.proceduresPerformed.map((proc) => (<View key={proc.id} style={[styles.medCard, { borderLeftColor: Colors.dash6 }]}><View style={{ flex: 1 }}><Text style={styles.medName}>{proc.name}</Text><Text style={styles.medDetails}>Cost: <Text>₹{proc.cost}</Text></Text></View><TouchableOpacity onPress={() => handleRemoveProcedure(proc.id)} style={[styles.iconBtn, { backgroundColor: Colors.danger + '20' }]}><FontAwesome5 name="trash-alt" size={14} color={Colors.danger} /></TouchableOpacity></View>))}<View style={[styles.addItemBox, { marginTop: 10 }]}><Text style={styles.subHeader}>Add Procedure</Text><View style={styles.row}><Input style={{ flex: 2, marginRight: 10 }} label="Procedure Name" placeholder="e.g., Dressing" value={currentProc.name} onChange={t => setCurrentProc({ ...currentProc, name: t })} /><Input style={{ flex: 1 }} label="Cost (₹)" kbd="numeric" value={currentProc.cost} onChange={t => setCurrentProc({ ...currentProc, cost: t })} /></View><TouchableOpacity style={[styles.btnSmall, { backgroundColor: Colors.dash6 }]} onPress={handleAddProcedure}><Text style={{ color: '#FFF', fontWeight: 'bold' }}>ADD PROCEDURE</Text></TouchableOpacity></View>
-
     <TouchableOpacity style={styles.btnPrimary} onPress={handleFinalSave}><Text style={styles.btnText}>{isEdit ? 'UPDATE' : 'SAVE'} PRESCRIPTION</Text></TouchableOpacity></ScrollView></View>);
 };
 
@@ -821,14 +847,9 @@ const TemplateManagerScreen = ({ templates, navigate, onEdit, onDelete }) => {
 
 const AddTemplateForm = ({ initialData, inventory, onSave, onCancel }) => {
   const isEdit = !!initialData; const medicineNames = [...new Set(inventory.map(i => i.name))]; const dosageForms = [...new Set(inventory.map(i => i.dosage))]; const [templateData, setTemplateData] = useState(initialData || { name: '', diagnosis: '', medicines: [] }); const [currentMed, setCurrentMed] = useState({ name: medicineNames[0] || '', strength: '', dosage: dosageForms[0] || 'Tablet', frequency: FREQUENCY_OPTIONS[0], duration: DURATION_OPTIONS[0], instructions: '' });
-  const handleAddMedicine = () => {
-    if (!currentMed.name || !currentMed.strength) { Alert.alert("Missing Fields", "Please enter Medicine Name and Strength."); return; }
-    const newMed = { ...currentMed, id: 'temp_med_' + Date.now() + Math.random() };
-    setTemplateData(prev => ({ ...prev, medicines: [...prev.medicines, newMed] }));
-    setCurrentMed({ name: medicineNames[0] || '', strength: '', dosage: dosageForms[0] || 'Tablet', frequency: FREQUENCY_OPTIONS[0], duration: DURATION_OPTIONS[0], instructions: '' });
-  };
+  const handleAddMedicine = () => { if (!currentMed.name || !currentMed.strength) { Toast.show({ type: 'error', text1: "Missing Fields", text2: "Please enter Medicine Name and Strength." }); return; } const newMed = { ...currentMed, id: 'temp_med_' + Date.now() + Math.random() }; setTemplateData(prev => ({ ...prev, medicines: [...prev.medicines, newMed] })); setCurrentMed({ name: medicineNames[0] || '', strength: '', dosage: dosageForms[0] || 'Tablet', frequency: FREQUENCY_OPTIONS[0], duration: DURATION_OPTIONS[0], instructions: '' }); };
   const handleRemoveMedicine = (id) => { setTemplateData(prev => ({ ...prev, medicines: prev.medicines.filter(m => m.id !== id) })); };
-  const handleFinalSave = () => { if (!templateData.name || !templateData.diagnosis) { Alert.alert("Incomplete Data", "Please enter a Template Name and a default Diagnosis."); return; } onSave(templateData); };
+  const handleFinalSave = () => { if (!templateData.name || !templateData.diagnosis) { Toast.show({ type: 'error', text1: "Incomplete Data", text2: "Please enter a Template Name and a default Diagnosis." }); return; } onSave(templateData); };
   return (<View style={styles.screenContainer}><Header title={isEdit ? "Edit Template" : "Add New Template"} onBack={onCancel} /><ScrollView contentContainerStyle={{ padding: 20 }}><Input label="Template Name" placeholder="e.g., Fever, Allergy" value={templateData.name} onChange={(t) => setTemplateData({ ...templateData, name: t })} /><Input label="Default Diagnosis" placeholder="e.g., Viral Fever" value={templateData.diagnosis} onChange={(t) => setTemplateData({ ...templateData, diagnosis: t })} /><Text style={styles.sectionTitle}>Medicines in Template (<Text>{templateData.medicines.length}</Text>)</Text>{templateData.medicines.map((med) => (<View key={med.id} style={styles.medCard}><View style={{ flex: 1 }}><Text style={styles.medName}>{med.name} - {med.strength}</Text><Text style={styles.medDetails}>{med.dosage} | {med.frequency} for {med.duration}</Text><Text style={styles.medInstructions}><FontAwesome5 name="clipboard" size={10} color={Colors.subText} /> <Text>{med.instructions}</Text></Text></View><TouchableOpacity onPress={() => handleRemoveMedicine(med.id)} style={[styles.iconBtn, { backgroundColor: Colors.danger + '20' }]}><FontAwesome5 name="trash-alt" size={14} color={Colors.danger} /></TouchableOpacity></View>))}<View style={[styles.addItemBox, { marginTop: 10 }]}><Text style={styles.subHeader}>Add Medicine to Template</Text><Text style={styles.label}>Medicine Name</Text><View style={styles.pickerContainer}><Picker selectedValue={currentMed.name} onValueChange={(v) => setCurrentMed({ ...currentMed, name: v })}>{medicineNames.map(name => <Picker.Item key={name} label={name} value={name} />)}</Picker></View><View style={styles.row}><Input style={{ flex: 1, marginRight: 10 }} label="Strength" value={currentMed.strength} onChange={(t) => setCurrentMed({ ...currentMed, strength: t })} /><View style={{ flex: 1 }}><Text style={styles.label}>Dosage Form</Text><View style={styles.pickerContainer}><Picker selectedValue={currentMed.dosage} onValueChange={(v) => setCurrentMed({ ...currentMed, dosage: v })} style={{ height: 40 }}>{dosageForms.map(f => <Picker.Item key={f} label={f} value={f} />)}</Picker></View></View></View><View style={styles.row}><View style={{ flex: 1, marginRight: 10 }}><Text style={styles.label}>Frequency</Text><View style={styles.pickerContainer}><Picker selectedValue={currentMed.frequency} onValueChange={(v) => setCurrentMed({ ...currentMed, frequency: v })} style={{ height: 40 }}>{FREQUENCY_OPTIONS.map(f => <Picker.Item key={f} label={f} value={f} />)}</Picker></View></View><View style={{ flex: 1 }}><Text style={styles.label}>Duration</Text><View style={styles.pickerContainer}><Picker selectedValue={currentMed.duration} onValueChange={(v) => setCurrentMed({ ...currentMed, duration: v })} style={{ height: 40 }}>{DURATION_OPTIONS.map(d => <Picker.Item key={d} label={d} value={d} />)}</Picker></View></View></View><Input label="Instructions" value={currentMed.instructions} onChange={(t) => setCurrentMed({ ...currentMed, instructions: t })} /><TouchableOpacity style={[styles.btnSmall, { backgroundColor: Colors.action }]} onPress={handleAddMedicine}><Text style={{ color: '#FFF', fontWeight: 'bold' }}>ADD TO TEMPLATE</Text></TouchableOpacity></View><TouchableOpacity style={styles.btnPrimary} onPress={handleFinalSave}><Text style={styles.btnText}>{isEdit ? 'UPDATE' : 'SAVE'} TEMPLATE</Text></TouchableOpacity></ScrollView></View>);
 };
 
@@ -837,45 +858,8 @@ const ProceduresHistoryScreen = ({ procedures, navigate, onEdit, onDelete }) => 
   return (
     <View style={styles.screenContainer}>
       <Header title="Procedures History" onBack={() => navigate(Screens.DASHBOARD)} onAdd={() => navigate(Screens.ADD_PROCEDURE)} />
-      <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
-        <View style={styles.revenueCard}>
-          <View>
-            <Text style={styles.revenueLabel}>Total Revenue from Procedures</Text>
-            <Text style={styles.revenueValue}>{formattedRevenue}</Text>
-          </View>
-          <FontAwesome5 name="rupee-sign" size={30} color="#FFF" opacity={0.8} />
-        </View>
-      </View>
-      <FlatList
-        data={procedures}
-        keyExtractor={item => item.id}
-        contentContainerStyle={{ padding: 20, paddingTop: 10 }}
-        renderItem={({ item }) => (
-          <View key={item.id} style={styles.card}>
-            <View style={styles.row}>
-              <View style={[styles.invIconBox, { backgroundColor: Colors.dash6 + '20' }]}>
-                <FontAwesome5 name="band-aid" size={20} color={Colors.dash6} />
-              </View>
-              <View style={{ flex: 1, marginLeft: 15 }}>
-                <Text style={styles.invName}>{item.procedureName}</Text>
-                <Text style={styles.cardSub}>{item.patientName}</Text>
-                <Text style={styles.cardSub}>{item.date}</Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.procedureCost}>₹{item.cost}</Text>
-              </View>
-            </View>
-            <View style={styles.cardActions}>
-              <View style={{ flex: 1 }}>
-                {item.notes ? <Text style={styles.notesText}><FontAwesome5 name="sticky-note" /> <Text>{item.notes}</Text></Text> : null}
-              </View>
-              <TouchableOpacity onPress={() => onEdit(item)} style={[styles.iconBtn, { backgroundColor: Colors.action + '20' }]}><FontAwesome5 name="pen" size={14} color={Colors.action} /></TouchableOpacity>
-              <TouchableOpacity onPress={() => onDelete(item.id)} style={[styles.iconBtn, { marginLeft: 10, backgroundColor: Colors.danger + '20' }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity>
-            </View>
-          </View>
-        )}
-        ListEmptyComponent={<View style={styles.emptyState}><FontAwesome5 name="folder-open" size={50} color={Colors.subText} /><Text style={styles.emptyText}>No procedures recorded yet.</Text></View>}
-      />
+      <View style={{ paddingHorizontal: 20, paddingTop: 20 }}><View style={styles.revenueCard}><View><Text style={styles.revenueLabel}>Total Revenue from Procedures</Text><Text style={styles.revenueValue}>{formattedRevenue}</Text></View><FontAwesome5 name="rupee-sign" size={30} color="#FFF" opacity={0.8} /></View></View>
+      <FlatList data={procedures} keyExtractor={item => item.id} contentContainerStyle={{ padding: 20, paddingTop: 10 }} renderItem={({ item }) => (<View key={item.id} style={styles.card}><View style={styles.row}><View style={[styles.invIconBox, { backgroundColor: Colors.dash6 + '20' }]}><FontAwesome5 name="band-aid" size={20} color={Colors.dash6} /></View><View style={{ flex: 1, marginLeft: 15 }}><Text style={styles.invName}>{item.procedureName}</Text><Text style={styles.cardSub}>{item.patientName}</Text><Text style={styles.cardSub}>{item.date}</Text></View><View style={{ alignItems: 'flex-end' }}><Text style={styles.procedureCost}>₹{item.cost}</Text></View></View><View style={styles.cardActions}><View style={{ flex: 1 }}>{item.notes ? <Text style={styles.notesText}><FontAwesome5 name="sticky-note" /> <Text>{item.notes}</Text></Text> : null}</View><TouchableOpacity onPress={() => onEdit(item)} style={[styles.iconBtn, { backgroundColor: Colors.action + '20' }]}><FontAwesome5 name="pen" size={14} color={Colors.action} /></TouchableOpacity><TouchableOpacity onPress={() => onDelete(item.id)} style={[styles.iconBtn, { marginLeft: 10, backgroundColor: Colors.danger + '20' }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity></View></View>)} ListEmptyComponent={<View style={styles.emptyState}><FontAwesome5 name="folder-open" size={50} color={Colors.subText} /><Text style={styles.emptyText}>No procedures recorded yet.</Text></View>} />
     </View>
   );
 };
@@ -883,16 +867,15 @@ const ProceduresHistoryScreen = ({ procedures, navigate, onEdit, onDelete }) => 
 const AddProcedureForm = ({ initialData, patients, onSave, onCancel }) => {
   const isEdit = !!initialData; const [form, setForm] = useState(initialData || { patientId: patients[0]?.id, procedureName: '', date: new Date().toLocaleDateString('en-CA'), cost: '', notes: '' }); const [date, setDate] = useState(new Date(form.date)); const [showDatePicker, setShowDatePicker] = useState(false);
   const onDateChange = (event, selectedDate) => { setShowDatePicker(false); if (event.type === 'set' && selectedDate) { setDate(selectedDate); setForm({ ...form, date: selectedDate.toLocaleDateString('en-CA') }); } };
-  const handleSave = () => { if (!form.patientId || !form.procedureName || !form.cost) { Alert.alert("Missing Fields", "Please fill in Patient, Procedure Name, and Cost."); return; } onSave(form); };
+  const handleSave = () => { if (!form.patientId || !form.procedureName || !form.cost) { Toast.show({ type: 'error', text1: "Missing Fields", text2: "Please fill in Patient, Procedure Name, and Cost." }); return; } onSave(form); };
   return (<View style={styles.screenContainer}><Header title={isEdit ? "Edit Procedure" : "Add Procedure"} onBack={onCancel} /><ScrollView contentContainerStyle={{ padding: 20 }}><Text style={styles.label}>Select Patient</Text><View style={styles.pickerContainer}><Picker selectedValue={form.patientId} onValueChange={v => setForm({ ...form, patientId: v })}>{patients.map(p => <Picker.Item key={p.id} label={p.name} value={p.id} />)}</Picker></View><Input label="Procedure Name" placeholder="e.g., Suture, Dressing" value={form.procedureName} onChange={t => setForm({ ...form, procedureName: t })} /><View style={styles.row}><View style={{ flex: 1, marginRight: 10 }}><Text style={styles.label}>Date</Text><TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.pickerBtn}><Text style={styles.pickerText}>{form.date}</Text><FontAwesome5 name="calendar-alt" size={16} color={Colors.primary} /></TouchableOpacity></View><Input style={{ flex: 1 }} label="Cost (₹)" kbd="numeric" value={form.cost} onChange={t => setForm({ ...form, cost: t })} /></View>{showDatePicker ? <DateTimePicker value={date} mode="date" display="default" onChange={onDateChange} maximumDate={new Date()} /> : null}<Input label="Notes (Optional)" placeholder="Any relevant notes..." value={form.notes} onChange={t => setForm({ ...form, notes: t })} multiline={true} style={{ height: 100 }} /><TouchableOpacity style={styles.btnPrimary} onPress={handleSave}><Text style={styles.btnText}>{isEdit ? 'UPDATE' : 'SAVE'} PROCEDURE</Text></TouchableOpacity></ScrollView></View>);
 };
 
 const DetailPill = ({ label, value, unit, color }) => (<View style={{ flexDirection: 'row', backgroundColor: color + '15', padding: 8, borderRadius: 10, margin: 3, flexBasis: '47%', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, color: color, fontWeight: 'bold' }}>{label}: </Text><Text style={{ fontSize: 14, color: Colors.text }}>{value} <Text style={{ fontSize: 10, color: Colors.subText }}>{value !== 'N/A' ? unit : ''}</Text></Text></View>);
-
 const Header = ({ title, onBack, onAdd }) => (<View style={styles.header}>{onBack ? <TouchableOpacity onPress={onBack}><MaterialIcons name="arrow-back-ios" size={24} color="#FFF" /></TouchableOpacity> : null}<Text style={styles.headerTitle}>{title}</Text>{onAdd ? <TouchableOpacity onPress={onAdd}><MaterialIcons name="add" size={32} color="#FFF" /></TouchableOpacity> : <View style={{ width: 32 }} />}</View>);
 const DashboardCard = ({ title, count, icon, color, onPress }) => (<TouchableOpacity style={styles.gridCard} onPress={onPress}><View style={[styles.iconCircle, { backgroundColor: color + '20' }]}><FontAwesome5 name={icon} size={24} color={color} /></View><Text style={styles.gridCount}>{String(count)}</Text><Text style={styles.gridTitle}>{title}</Text></TouchableOpacity>);
 const VitalBox = ({ label, val, unit, icon, color }) => (<View style={[styles.vitalCard, { borderTopColor: color }]}><FontAwesome5 name={icon} size={20} color={color} /><Text style={styles.vitalVal}>{val || 'N/A'} <Text style={{ fontSize: 12, color: Colors.subText }}>{val ? unit : ''}</Text></Text><Text style={styles.vitalLabel}>{label}</Text></View>);
-const Input = ({ label, value, onChange, style, kbd, placeholder, multiline }) => (<View style={[{ marginBottom: 15 }, style]}><Text style={styles.label}>{label}</Text><TextInput style={[styles.inputBox, multiline && { height: style?.height || 80, textAlignVertical: 'top' }]} value={value} onChangeText={onChange} keyboardType={kbd || 'default'} placeholder={placeholder} multiline={multiline} /></View>);
+const Input = ({ label, value, onChange, style, kbd, placeholder, multiline }) => (<View style={[{ marginBottom: 15 }, style]}>{label ? <Text style={styles.label}>{label}</Text> : null}<TextInput style={[styles.inputBox, multiline && { height: style?.height || 80, textAlignVertical: 'top' }]} value={value} onChangeText={onChange} keyboardType={kbd || 'default'} placeholder={placeholder} multiline={multiline} /></View>);
 const DrawerItem = ({ icon, label, color, onPress }) => (<TouchableOpacity style={styles.drawerItem} onPress={onPress}><FontAwesome5 name={icon} size={20} color={color} style={{ width: 40 }} /><Text style={[styles.drawerLabel, { color }]}>{label}</Text></TouchableOpacity>);
 const styles = StyleSheet.create({
   // --- LAYOUT & BASICS ---
@@ -1071,7 +1054,6 @@ const styles = StyleSheet.create({
   drawerOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100, flexDirection: 'row' },
   drawer: { width: width * 0.75, backgroundColor: '#FFF', height: '100%' },
   drawerHeader: { justifyContent: 'flex-end', padding: 20, backgroundColor: Colors.bg },
-  drawerHeaderContent: {},
   drawerTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.text, marginTop: 10 },
   drawerSub: { color: Colors.subText },
   drawerItem: { flexDirection: 'row', padding: 15, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#FAFAFA' },
