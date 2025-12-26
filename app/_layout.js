@@ -550,13 +550,182 @@ const PatientList = ({ patients, navigate, onDelete, onEdit, onBook }) => {
   return (<View style={styles.screenContainer}><Header title="Patients" onBack={() => navigate(Screens.DASHBOARD)} onAdd={() => navigate(Screens.ADD_PATIENT)} /><View style={styles.searchContainer}><Ionicons name="search" size={20} color={Colors.subText} /><TextInput style={styles.searchInput} placeholder="Search Patient..." value={search} onChangeText={setSearch} /></View><FlatList data={filtered} keyExtractor={i => i.id} contentContainerStyle={{ padding: 20 }} renderItem={({ item }) => (<View key={item.id} style={styles.card}><TouchableOpacity style={styles.row} onPress={() => navigate(Screens.PATIENT_DETAILS, item)}><Image source={{ uri: item.image || 'https://via.placeholder.com/50' }} style={styles.listAvatar} /><View style={{ flex: 1, marginLeft: 15 }}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.cardSub}>{item.gender}, {item.age} yrs</Text></View></TouchableOpacity><View style={styles.cardActions}><TouchableOpacity onPress={() => setBookModal(item)} style={styles.actionLabelBtn}><FontAwesome5 name="calendar-plus" size={14} color={Colors.primary} /><Text style={styles.actionLabelText}>Book</Text></TouchableOpacity><TouchableOpacity onPress={() => onEdit(item)} style={styles.iconBtn}><FontAwesome5 name="pen" size={14} color={Colors.action} /></TouchableOpacity><TouchableOpacity onPress={() => onDelete(item.id)} style={[styles.iconBtn, { marginLeft: 10 }]}><FontAwesome5 name="trash" size={14} color={Colors.danger} /></TouchableOpacity></View></View>)} /><Modal visible={!!bookModal} transparent={true} animationType="slide"><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Book Appointment</Text><Text style={{ textAlign: 'center', color: Colors.primary, marginBottom: 15, fontWeight: 'bold' }}>{bookModal?.name}</Text><Input label="Reason" value={apptReason} onChange={setApptReason} /><TouchableOpacity style={[styles.row, { marginBottom: 20 }]} onPress={() => setIsFollowUp(!isFollowUp)}><FontAwesome5 name={isFollowUp ? "check-square" : "square"} size={20} color={Colors.primary} /><Text style={{ marginLeft: 10, color: Colors.text }}>Follow Up?</Text></TouchableOpacity><View style={styles.row}><TouchableOpacity style={[styles.btnPrimary, { flex: 1, backgroundColor: Colors.subText, marginRight: 10 }]} onPress={() => setBookModal(null)}><Text style={styles.btnText}>CANCEL</Text></TouchableOpacity><TouchableOpacity style={[styles.btnPrimary, { flex: 1 }]} onPress={() => { onBook(bookModal, apptTime, apptReason, isFollowUp ? 'Follow Up' : 'Consultation'); setBookModal(null); }}><Text style={styles.btnText}>CONFIRM</Text></TouchableOpacity></View></View></View></Modal></View>);
 };
 
-const PatientDetails = ({ patient, labs, navigate }) => {
-  if (!patient) return null;
-  const handleShareID = async () => { try { await Share.share({ message: `*MEDICAL ID CARD*\nName: ${patient.name}\nID: ${patient.id}\nGender: ${patient.gender}\nAge: ${patient.age}\nBlood: ${patient.blood}\nPhone: ${patient.phone}`, }); } catch (error) { Toast.show({ type: 'error', text1: 'Share Error', text2: error.message }); } };
-  return (<View style={styles.screenContainer}><Header title="Patient Profile" onBack={() => navigate(Screens.PATIENT_LIST)} /><ScrollView contentContainerStyle={{ padding: 20 }}><View style={styles.idCard}><View style={styles.idTop}><Text style={styles.idTitle}>MEDICAL ID CARD</Text><TouchableOpacity onPress={handleShareID}><FontAwesome5 name="share-alt" size={20} color="#FFF" /></TouchableOpacity></View><View style={styles.idContent}><Image source={{ uri: patient.image || 'https://via.placeholder.com/100' }} style={styles.idPhoto} /><View style={{ marginLeft: 15, flex: 1 }}><Text style={styles.idName}>{patient.name}</Text><Text style={styles.idRow}><Text>ID: {patient.id}</Text></Text><Text style={styles.idRow}><Text>{patient.gender}, {patient.age} Yrs</Text></Text><Text style={styles.idRow}><Text>Ph: {patient.phone}</Text></Text><Text style={styles.idRow}><Text>Blood: {patient.blood}</Text></Text></View></View></View><Text style={styles.sectionTitle}>Vitals</Text><View style={styles.vitalGrid}><VitalBox label="HR" val={patient.vitals.hr} unit="bpm" icon="heartbeat" color={Colors.danger} /><VitalBox label="BP" val={patient.vitals.bp} unit="" icon="tint" color={Colors.action} /><VitalBox label="Temp" val={patient.vitals.temp} unit="F" icon="thermometer-half" color={Colors.warning} /></View><View style={[styles.vitalGrid, { marginTop: 10 }]}><VitalBox label="SpO2" val={patient.vitals.spo2} unit="%" icon="lungs" color={Colors.success} /><VitalBox label="Weight" val={patient.vitals.weight} unit="kg" icon="weight" color={Colors.primary} /><TouchableOpacity style={[styles.vitalCard, { borderTopColor: Colors.dash4, justifyContent: 'center' }]} onPress={() => navigate(Screens.RX_HISTORY, patient)}><FontAwesome5 name="prescription-bottle-alt" size={20} color={Colors.dash4} /><Text style={{ fontSize: 12, fontWeight: 'bold', color: Colors.dash4, marginTop: 5 }}>Rx History</Text></TouchableOpacity></View><Text style={styles.sectionTitle}>Lab Reports</Text><View style={{ backgroundColor: Colors.card, borderRadius: 15, padding: 15, elevation: 2 }}>{labs.filter(l => l.patientId === patient.id).length > 0 ? (labs.filter(l => l.patientId === patient.id).map(l => (<Text key={l.id} style={{ marginBottom: 5, color: Colors.text }}>{l.date} - {l.testName}</Text>))) : (<Text style={{ color: Colors.subText, fontStyle: 'italic' }}>No lab reports on file.</Text>)}<TouchableOpacity style={[styles.btnPrimary, { marginTop: 15, padding: 10 }]} onPress={() => navigate(Screens.ADD_LAB, { patientId: patient.id, patientName: patient.name })}><Text style={[styles.btnText, { fontSize: 14 }]}>ADD NEW REPORT</Text></TouchableOpacity></View></ScrollView></View>);
+  const PatientDetails = ({ patient, labs, navigate }) => {
+    if (!patient) return null;
+
+    const handleShareID = async () => {
+      try {
+        await Share.share({
+          message: `*MEDICAL ID CARD*\nName: ${patient.name}\nID: ${patient.id}\nDoctor: Dr. Mansoor Ali V. P.`,
+        });
+      } catch (error) {
+        Toast.show({ type: 'error', text1: 'Share Error', text2: error.message });
+      }
+    };
+
+    const handleDownloadID = async () => {
+      try {
+        const html = `
+          <html>
+            <head>
+              <style>
+                body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background: white; }
+                .id-card { 
+                  width: 500px; 
+                  background: #0D746A; 
+                  border-radius: 20px; 
+                  padding: 30px; 
+                  color: white;
+                  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+                }
+                .header { text-align: center; margin-bottom: 20px; }
+                .title { font-size: 24px; font-weight: bold; letter-spacing: 3px; }
+                .content { display: flex; gap: 20px; margin-bottom: 20px; }
+                .avatar { width: 100px; height: 100px; border-radius: 50%; background: white; flex-shrink: 0; }
+                .info { flex: 1; }
+                .info-row { margin-bottom: 8px; font-size: 14px; }
+                .label { color: #B2DFDB; font-weight: bold; }
+                .divider { height: 2px; background: #FBC02D; margin: 15px 0; }
+                .footer { text-align: center; }
+                .footer-label { color: #B2DFDB; font-size: 12px; margin-bottom: 5px; }
+                .doctor-name { font-size: 20px; font-weight: bold; font-style: italic; margin-bottom: 10px; }
+                .location { color: #FBC02D; font-size: 14px; font-weight: bold; text-transform: uppercase; margin-bottom: 15px; }
+                .booking { background: white; color: #0D746A; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 12px; }
+              </style>
+            </head>
+            <body>
+              <div class="id-card">
+                <div class="header">
+                  <div class="title">ID CARD</div>
+                </div>
+                <div class="content">
+                  <img src="${patient.image || 'https://via.placeholder.com/100'}" class="avatar" />
+                  <div class="info">
+                    <div class="info-row"><span class="label">PATIENT NAME:</span> ${patient.name.toUpperCase()}</div>
+                    <div class="info-row"><span class="label">ID NO:</span> ${patient.id}</div>
+                    <div class="info-row"><span class="label">AGE/GENDER:</span> ${patient.age} Yrs / ${patient.gender}</div>
+                    <div class="info-row"><span class="label">PHONE:</span> ${patient.phone}</div>
+                  </div>
+                </div>
+                <div class="divider"></div>
+                <div class="footer">
+                  <div class="footer-label">CONSULTANT DOCTOR:</div>
+                  <div class="doctor-name">Dr. Mansoor Ali V. P.</div>
+                  <div class="location">PATHAPPIRIYAM</div>
+                  <div class="booking">APPOINTMENT BOOKING: +91 8606344694</div>
+                </div>
+              </div>
+            </body>
+          </html>
+        `;
+        const { uri } = await Print.printToFileAsync({ html });
+        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Download ID Card' });
+      Toast.show({ type: 'success', text1: 'Success', text2: 'ID Card downloaded!' });
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to download ID Card' });
+    }
+  };
+
+  // Helper for the ID Card Rows
+  const IdRow = ({ label, value }) => (
+    <View style={styles.idRowContainer}>
+      <Text style={styles.idLabel}>{label}:</Text>
+      <Text style={styles.idValue}> : {value}</Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.screenContainer}>
+      <Header title="Patient Profile" onBack={() => navigate(Screens.PATIENT_LIST)} />
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+
+        {/* --- NEW ID CARD DESIGN START --- */}
+        <View style={styles.idCard}>
+          {/* Header */}
+          <View style={styles.idHeaderContainer}>
+            <Text style={styles.idCardTitle}>ID CARD</Text>
+            {/* Share & Download Icons */}
+            <View style={{ position: 'absolute', right: 0, flexDirection: 'row' }}>
+              <TouchableOpacity onPress={handleDownloadID} style={{ marginRight: 15 }}>
+                <FontAwesome5 name="download" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleShareID}>
+                <FontAwesome5 name="share-alt" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Content Row */}
+          <View style={styles.idContentRow}>
+            {/* Left: Avatar */}
+            <View style={styles.idAvatarContainer}>
+              <Image
+                source={{ uri: patient.image || 'https://via.placeholder.com/100' }}
+                style={styles.idAvatarImage} />
+            </View>
+
+            {/* Right: Info */}
+            <View style={styles.idInfoColumn}>
+              <IdRow label="PATIENT NAME" value={patient.name.toUpperCase()} />
+              <IdRow label="ID NO" value={patient.id} />
+              <IdRow label="AGE/GENDER" value={`${patient.age} Yrs / ${patient.gender}`} />
+              <IdRow label="PHONE" value={patient.phone} />
+            </View>
+          </View>
+
+          {/* Divider */}
+          <View style={styles.idDivider} />
+
+          {/* Footer */}
+          <View style={styles.idFooterContainer}>
+            <Text style={styles.idConsultantLabel}>CONSULTANT DOCTOR:</Text>
+            <Text style={styles.idDoctorName}>Dr. Mansoor Ali V. P.</Text>
+            <Text style={styles.idLocationText}>PATHAPPIRIYAM</Text>
+
+            <View style={styles.idBookingButton}>
+              <Text style={styles.idBookingText}>
+                APPOINTMENT BOOKING: +91 8606344694
+              </Text>
+            </View>
+          </View>
+        </View>
+        {/* --- NEW ID CARD DESIGN END --- */}
+
+        <Text style={styles.sectionTitle}>Vitals</Text>
+        <View style={styles.vitalGrid}>
+          <VitalBox label="HR" val={patient.vitals.hr} unit="bpm" icon="heartbeat" color={Colors.danger} />
+          <VitalBox label="BP" val={patient.vitals.bp} unit="" icon="tint" color={Colors.action} />
+          <VitalBox label="Temp" val={patient.vitals.temp} unit="F" icon="thermometer-half" color={Colors.warning} />
+        </View>
+        <View style={[styles.vitalGrid, { marginTop: 10 }]}>
+          <VitalBox label="SpO2" val={patient.vitals.spo2} unit="%" icon="lungs" color={Colors.success} />
+          <VitalBox label="Weight" val={patient.vitals.weight} unit="kg" icon="weight" color={Colors.primary} />
+          <TouchableOpacity style={[styles.vitalCard, { borderTopColor: Colors.dash4, justifyContent: 'center' }]} onPress={() => navigate(Screens.RX_HISTORY, patient)}>
+            <FontAwesome5 name="prescription-bottle-alt" size={20} color={Colors.dash4} />
+            <Text style={{ fontSize: 12, fontWeight: 'bold', color: Colors.dash4, marginTop: 5 }}>Rx History</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.sectionTitle}>Lab Reports</Text>
+        <View style={{ backgroundColor: Colors.card, borderRadius: 15, padding: 15, elevation: 2 }}>
+          {labs.filter(l => l.patientId === patient.id).length > 0 ? (
+            labs.filter(l => l.patientId === patient.id).map(l => (
+              <Text key={l.id} style={{ marginBottom: 5, color: Colors.text }}>{l.date} - {l.testName}</Text>
+            ))
+          ) : (
+            <Text style={{ color: Colors.subText, fontStyle: 'italic' }}>No lab reports on file.</Text>
+          )}
+          <TouchableOpacity style={[styles.btnPrimary, { marginTop: 15, padding: 10 }]} onPress={() => navigate(Screens.ADD_LAB, { patientId: patient.id, patientName: patient.name })}>
+            <Text style={[styles.btnText, { fontSize: 14 }]}>ADD NEW REPORT</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
+  );
+
 };
 
-const PatientForm = ({ initialData, onSave, onCancel }) => {
+function PatientForm({ initialData, onSave, onCancel }) {
   const [form, setForm] = useState(initialData || { name: '', age: '', gender: 'Male', phone: '', blood: '', image: null, vitals: { bp: '', hr: '', temp: '', spo2: '', weight: '' } });
   const [bookAppt, setBookAppt] = useState(false);
   const [apptDateObj, setApptDateObj] = useState(new Date());
@@ -564,7 +733,7 @@ const PatientForm = ({ initialData, onSave, onCancel }) => {
   const [mode, setMode] = useState('date');
   const [apptReason, setApptReason] = useState('');
   const [isFollowUp, setIsFollowUp] = useState(false);
-  
+
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
     if (!result.canceled) setForm({ ...form, image: result.assets[0].uri });
@@ -644,7 +813,7 @@ const PatientForm = ({ initialData, onSave, onCancel }) => {
       </ScrollView>
     </View>
   );
-};
+}
 
 const LabList = ({ labs, navigate, onDelete, onEdit }) => {
   const [viewImage, setViewImage] = useState(null);
@@ -917,13 +1086,117 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 8, backgroundColor: '#F5F7FA', borderRadius: 8 },
   searchContainer: { flexDirection: 'row', backgroundColor: '#FFF', marginBottom: 15, borderRadius: 10, padding: 10, alignItems: 'center', elevation: 2 },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 16 },
-  idCard: { backgroundColor: Colors.text, borderRadius: 20, padding: 20, marginBottom: 20, elevation: 8 },
-  idTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  idTitle: { color: '#FFF', fontWeight: 'bold', letterSpacing: 2 },
-  idContent: { flexDirection: 'row', alignItems: 'center' },
-  idPhoto: { width: 90, height: 110, borderRadius: 10, backgroundColor: '#EEE' },
-  idName: { color: Colors.primary, fontSize: 20, fontWeight: 'bold', marginBottom: 5 },
-  idRow: { color: '#CFD8DC', fontSize: 12, marginBottom: 3 },
+idCard: {
+    backgroundColor: '#0D746A', // Specific Teal Color from image
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    elevation: 8,
+    width: '100%',
+    maxWidth: 'auto',
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  idHeaderContainer: {
+    alignItems: 'center',
+    marginBottom: 15,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  idCardTitle: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 18,
+    letterSpacing: 3,
+  },
+  idContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  idAvatarContainer: {
+    width: 90,
+    height: 90,
+    borderRadius: 45, // Perfect circle
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+    overflow: 'hidden',
+  },
+  idAvatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  idInfoColumn: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  idRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  idLabel: {
+    color: '#B2DFDB', // Light teal text
+    fontSize: 10,
+    fontWeight: '600',
+    width: 80, 
+  },
+  idValue: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  idDivider: {
+    height: 2,
+    backgroundColor: '#FBC02D', // Yellow divider
+    width: '100%',
+    marginVertical: 10,
+    borderRadius: 1,
+  },
+  idFooterContainer: {
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  idConsultantLabel: {
+    color: '#B2DFDB',
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  idDoctorName: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontStyle: 'italic',
+    marginVertical: 4,
+  },
+  idLocationText: {
+    color: '#FBC02D', // Yellow text
+    fontSize: 14,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    marginBottom: 15,
+  },
+  idBookingButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  idBookingText: {
+    color: '#002f2a', // Dark text for contrast
+    fontWeight: 'bold',
+    fontSize: 11, 
+  },
   vitalGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   vitalCard: { width: '30%', backgroundColor: '#FFF', padding: 10, borderRadius: 12, alignItems: 'center', borderTopWidth: 4, elevation: 3, justifyContent: 'space-between' },
   vitalVal: { fontSize: 18, fontWeight: 'bold', marginTop: 5 },
