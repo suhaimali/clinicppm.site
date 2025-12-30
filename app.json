@@ -1,27 +1,20 @@
-﻿{
+{
   "expo": {
     "name": "suhaimast",
     "slug": "suhaimast",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "icon": "./assets/images/ic_launcher_monochrome.png",
     "splash": {
-      "image": "/assets/play_store_512.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#000000"
-    },
-    "androidStatusBar": {
-      "backgroundColor": "#000000",
-      "barStyle": "light-content",
-      "translucent": false
+      "image": "./assets/images/ic_launcher_monochrome.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
     },
     "android": {
-      "backgroundColor": "#000000",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/ic_launcher_monochrome.png",
+        "backgroundColor": "#ffffff"
+      },
       "package": "com.suhaimsoft.suhaimast"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "0e30faf1-7012-415c-b2ee-e08bfc0094ec"
-      }
     },
     "plugins": [
       "@react-native-community/datetimepicker"
