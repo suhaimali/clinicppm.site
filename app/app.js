@@ -32,10 +32,10 @@ import {
     AlertCircle,
     Archive,
     ArrowLeft,
+    BellRing,
     BookOpen,
     Cake,
     Calendar,
-    CalendarPlus,
     Check,
     CheckCircle2,
     ChevronDown,
@@ -51,6 +51,7 @@ import {
     Filter,
     FlaskConical,
     HeartPulse,
+    HelpCircle,
     History,
     Home,
     Layers,
@@ -62,7 +63,6 @@ import {
     MapPin,
     Menu,
     MessageCircle,
-    MinusCircle,
     Moon,
     Package,
     Pencil,
@@ -81,11 +81,13 @@ import {
     Tag,
     TestTube,
     Thermometer,
+    Timer, // Added for Procedures
     Trash2,
     User,
     UserPlus,
     Weight,
-    X
+    X,
+    Banknote // Added for Procedures
 } from 'lucide-react-native';
 
 // --- THEME CONFIGURATION ---
@@ -110,6 +112,98 @@ const THEMES = {
 
 const { width, height } = Dimensions.get('window');
 
+// --- 3D ANIMATED TOAST COMPONENT ---
+const ToastNotification = ({ visible, title, message, type = 'success', onHide, theme }) => {
+    const insets = useSafeAreaInsets();
+    const translateY = useRef(new Animated.Value(-150)).current;
+    const opacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (visible) {
+            // Slide In
+            Animated.parallel([
+                Animated.spring(translateY, {
+                    toValue: insets.top + 10,
+                    useNativeDriver: true,
+                    damping: 15,
+                    stiffness: 120
+                }),
+                Animated.timing(opacity, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true
+                })
+            ]).start();
+
+            // Auto Hide
+            const timer = setTimeout(() => {
+                hideToast();
+            }, 3000);
+
+            return () => clearTimeout(timer);
+        }
+    }, [visible]);
+
+    const hideToast = () => {
+        Animated.parallel([
+            Animated.timing(translateY, {
+                toValue: -150,
+                duration: 300,
+                useNativeDriver: true,
+                easing: Easing.in(Easing.ease)
+            }),
+            Animated.timing(opacity, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true
+            })
+        ]).start(() => {
+            if (onHide) onHide();
+        });
+    };
+
+    if (!visible) return null;
+
+    // Config based on type
+    const config = {
+        success: { colors: ['#059669', '#34d399'], icon: CheckCircle2, shadow: '#059669' },
+        error: { colors: ['#dc2626', '#f87171'], icon: AlertCircle, shadow: '#dc2626' },
+        warning: { colors: ['#d97706', '#fbbf24'], icon: AlertCircle, shadow: '#d97706' },
+        info: { colors: ['#2563eb', '#60a5fa'], icon: BellRing, shadow: '#2563eb' }
+    }[type] || config.success;
+
+    const Icon = config.icon;
+
+    return (
+        <Animated.View style={[
+            styles.toastContainer, 
+            { 
+                transform: [{ translateY }], 
+                opacity,
+                shadowColor: config.shadow
+            }
+        ]}>
+            <LinearGradient
+                colors={config.colors}
+                start={{x: 0, y: 0}}
+                end={{x: 1, y: 1}}
+                style={styles.toastGradient}
+            >
+                <View style={styles.toastIconBox}>
+                    <Icon color="white" size={24} strokeWidth={3} />
+                </View>
+                <View style={{flex: 1}}>
+                    <Text style={styles.toastTitle}>{title}</Text>
+                    <Text style={styles.toastMessage}>{message}</Text>
+                </View>
+                <TouchableOpacity onPress={hideToast} style={{padding: 5}}>
+                    <X color="rgba(255,255,255,0.8)" size={18} />
+                </TouchableOpacity>
+            </LinearGradient>
+        </Animated.View>
+    );
+};
+
 // --- CONSTANTS ---
 const INITIAL_FORM_STATE = { 
     name: '', mobile: '', email: '', age: '', gender: 'M', address: '', 
@@ -131,6 +225,24 @@ const INITIAL_PATIENTS = [
     { id: 101, name: "Sarah Jenkins", mobile: "9876543210", email: "sarah.j@example.com", age: "28", dob: "1996-01-10", gender: "F", blood: "A+", address: "New York, NY", registeredDate: "Jan 10, 2024", vitalsHistory: [] },
     { id: 102, name: "Mike Ross", mobile: "9988776655", email: "mike.ross@law.com", age: "35", dob: "1989-02-01", gender: "M", blood: "O-", address: "Brooklyn, NY", registeredDate: "Feb 01, 2024", vitalsHistory: [] },
     { id: 822, name: "Suhaim", mobile: "8891479505", email: "suhaim@example.com", age: "18", dob: "2006-05-15", gender: "M", blood: "O+", address: "Pathappiriyam", registeredDate: "Feb 19, 2026", vitalsHistory: [] },
+];
+
+// --- NEW DATA FOR PROCEDURES ---
+const PROCEDURE_CATEGORIES = [
+    { label: 'General', value: 'General', color: '#3b82f6', bg: '#eff6ff', icon: Stethoscope },
+    { label: 'Dental', value: 'Dental', color: '#06b6d4', bg: '#ecfeff', icon: Sparkles },
+    { label: 'Surgery', value: 'Surgery', color: '#ef4444', bg: '#fef2f2', icon: Activity },
+    { label: 'Lab Test', value: 'Lab', color: '#8b5cf6', bg: '#f5f3ff', icon: TestTube },
+    { label: 'Therapy', value: 'Therapy', color: '#10b981', bg: '#ecfdf5', icon: HeartPulse },
+    { label: 'Other', value: 'Other', color: '#64748b', bg: '#f1f5f9', icon: Layers },
+];
+
+const INITIAL_PROCEDURES = [
+    { id: 1, name: "General Consultation", cost: "500", duration: "15 min", category: "General", notes: "Standard physician checkup" },
+    { id: 2, name: "Root Canal Treatment", cost: "4500", duration: "60 min", category: "Dental", notes: "Requires anesthesia" },
+    { id: 3, name: "Blood Sugar (FBS/PP)", cost: "150", duration: "10 min", category: "Lab", notes: "Fasting required for FBS" },
+    { id: 4, name: "E.C.G.", cost: "300", duration: "15 min", category: "Lab", notes: "Electrocardiogram" },
+    { id: 5, name: "Wound Dressing", cost: "250", duration: "20 min", category: "General", notes: "Includes consumables" },
 ];
 
 const INITIAL_TEMPLATES = [
@@ -202,6 +314,48 @@ const calculateAge = (date) => {
     return Math.abs(age_dt.getUTCFullYear() - 1970).toString();
 };
 
+// --- REUSABLE COMPONENTS ---
+const GenderSelector = ({ value, onChange, theme }) => {
+    const options = [
+        { label: 'Male', val: 'M' },
+        { label: 'Female', val: 'F' },
+        { label: 'Other', val: 'O' }
+    ];
+
+    return (
+        <View style={{ marginBottom: 15 }}>
+            <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Gender</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+                {options.map((opt) => {
+                    const isActive = value === opt.val;
+                    return (
+                        <TouchableOpacity 
+                            key={opt.val} 
+                            onPress={() => onChange(opt.val)}
+                            style={{ 
+                                flex: 1, 
+                                backgroundColor: isActive ? theme.primary : theme.cardBg, 
+                                paddingVertical: 12, 
+                                borderRadius: 12, 
+                                alignItems: 'center',
+                                borderWidth: 1,
+                                borderColor: isActive ? theme.primary : theme.border
+                            }}
+                        >
+                            <Text style={{ 
+                                color: isActive ? 'white' : theme.text, 
+                                fontWeight: 'bold' 
+                            }}>
+                                {opt.label}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+        </View>
+    );
+};
+
 const FeatureCard = ({ item, index, theme, onAction, fullWidth = false }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -263,9 +417,287 @@ const CustomPicker = ({ visible, title, data, onSelect, onClose, theme, colored 
     );
 };
 
+// --- PROCEDURES MANAGEMENT SCREEN ---
+const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast }) => {
+    const insets = useSafeAreaInsets();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [modalVisible, setModalVisible] = useState(false);
+    const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+    const [formData, setFormData] = useState({ id: null, name: '', cost: '', duration: '', category: 'General', notes: '' });
+    const [isEditing, setIsEditing] = useState(false);
+
+    const filteredProcedures = procedures.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const getCategoryDetails = (catName) => PROCEDURE_CATEGORIES.find(c => c.value === catName) || PROCEDURE_CATEGORIES[0];
+
+    const openAdd = () => {
+        setFormData({ id: null, name: '', cost: '', duration: '', category: 'General', notes: '' });
+        setIsEditing(false);
+        setModalVisible(true);
+    };
+
+    const openEdit = (item) => {
+        setFormData({ ...item });
+        setIsEditing(true);
+        setModalVisible(true);
+    };
+
+    const handleSave = () => {
+        if (!formData.name || !formData.cost) {
+            Alert.alert("Missing Information", "Procedure Name and Cost are required.");
+            return;
+        }
+
+        if (isEditing) {
+            const updated = procedures.map(p => p.id === formData.id ? formData : p);
+            setProcedures(updated);
+            showToast('Success', 'Procedure Updated Successfully', 'success');
+        } else {
+            const newItem = { ...formData, id: Date.now() };
+            setProcedures([newItem, ...procedures]);
+            showToast('Success', 'New Procedure Added', 'success');
+        }
+        setModalVisible(false);
+    };
+
+    const handleDelete = (id) => {
+        Alert.alert("Delete", "Are you sure you want to remove this procedure?", [
+            { text: "Cancel" },
+            { text: "Delete", style: 'destructive', onPress: () => {
+                setProcedures(procedures.filter(p => p.id !== id));
+                showToast('Deleted', 'Procedure removed', 'error');
+            }}
+        ]);
+    };
+
+    return (
+        <View style={[styles.container, { backgroundColor: theme.bg }]}>
+             <View style={[styles.header, { marginTop: insets.top + 10 }]}>
+                <TouchableOpacity onPress={onBack} style={[styles.iconBtn, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+                    <ArrowLeft size={24} color={theme.text} />
+                </TouchableOpacity>
+                <View style={{flex: 1, paddingHorizontal: 15}}>
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>Medical Procedures</Text>
+                    <Text style={{ fontSize: 12, color: theme.textDim }}>Manage services & pricing</Text>
+                </View>
+                <TouchableOpacity onPress={openAdd} style={[styles.iconBtn, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
+                    <Plus size={24} color="white" />
+                </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingHorizontal: 20, marginBottom: 15 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.cardBg, borderRadius: 14, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: theme.border, shadowColor: "#000", shadowOpacity: 0.05, elevation: 2 }}>
+                    <Search size={20} color={theme.textDim} style={{ marginRight: 10 }} />
+                    <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} placeholder="Search procedures..." placeholderTextColor={theme.textDim} value={searchQuery} onChangeText={setSearchQuery} />
+                    {searchQuery.length > 0 && <TouchableOpacity onPress={() => setSearchQuery('')}><X size={18} color={theme.textDim} /></TouchableOpacity>}
+                </View>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}>
+                 <View style={{flexDirection: 'row', gap: 10, marginBottom: 20}}>
+                     <View style={{flex: 1, backgroundColor: theme.inputBg, padding: 15, borderRadius: 12, borderWidth: 1, borderColor: theme.border, alignItems: 'center'}}>
+                         <Text style={{color: theme.text, fontWeight: 'bold', fontSize: 20}}>{procedures.length}</Text>
+                         <Text style={{color: theme.textDim, fontSize: 11}}>Total Procedures</Text>
+                     </View>
+                     <View style={{flex: 1, backgroundColor: theme.inputBg, padding: 15, borderRadius: 12, borderWidth: 1, borderColor: theme.border, alignItems: 'center'}}>
+                         <Text style={{color: theme.text, fontWeight: 'bold', fontSize: 20}}>{PROCEDURE_CATEGORIES.length}</Text>
+                         <Text style={{color: theme.textDim, fontSize: 11}}>Categories</Text>
+                     </View>
+                 </View>
+
+                 {filteredProcedures.map((item) => {
+                     const cat = getCategoryDetails(item.category);
+                     const CatIcon = cat.icon;
+                     return (
+                         <View key={item.id} style={{ backgroundColor: theme.cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: theme.border, shadowColor: "#000", shadowOffset: {width:0, height:2}, shadowOpacity: 0.05, elevation: 2 }}>
+                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                                 <View style={{ flexDirection: 'row', gap: 12, flex: 1 }}>
+                                     <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: cat.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                         <CatIcon size={22} color={cat.color} />
+                                     </View>
+                                     <View style={{ flex: 1 }}>
+                                         <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text }}>{item.name}</Text>
+                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: cat.color }} />
+                                             <Text style={{ fontSize: 12, color: theme.textDim, fontWeight: '500' }}>{item.category}</Text>
+                                         </View>
+                                     </View>
+                                 </View>
+                                 <View style={{ alignItems: 'flex-end' }}>
+                                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.primary }}>₹{item.cost}</Text>
+                                 </View>
+                             </View>
+                             
+                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: theme.border }}>
+                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                     <Timer size={14} color={theme.textDim} />
+                                     <Text style={{ color: theme.textDim, fontSize: 12 }}>{item.duration || 'N/A'}</Text>
+                                 </View>
+                                 <View style={{ flexDirection: 'row', gap: 10 }}>
+                                     <TouchableOpacity onPress={() => openEdit(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                         <Pencil size={14} color={theme.textDim} />
+                                         <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textDim }}>Edit</Text>
+                                     </TouchableOpacity>
+                                     <TouchableOpacity onPress={() => handleDelete(item.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                         <Trash2 size={14} color="#ef4444" />
+                                         <Text style={{ fontSize: 12, fontWeight: '600', color: "#ef4444" }}>Delete</Text>
+                                     </TouchableOpacity>
+                                 </View>
+                             </View>
+                         </View>
+                     );
+                 })}
+                 {filteredProcedures.length === 0 && (
+                    <View style={{ alignItems: 'center', marginTop: 40, opacity: 0.6 }}>
+                        <Settings size={40} color={theme.textDim} />
+                        <Text style={{ color: theme.textDim, marginTop: 10 }}>No procedures found.</Text>
+                    </View>
+                 )}
+            </ScrollView>
+
+            {/* ADD/EDIT MODAL */}
+            <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+                         <TouchableOpacity style={{ flex: 1 }} onPress={() => setModalVisible(false)} />
+                         <View style={{ backgroundColor: theme.cardBg, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, shadowColor: "#000", shadowOpacity:0.3, elevation:20 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
+                                <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{isEditing ? 'Edit Procedure' : 'New Procedure'}</Text>
+                                <TouchableOpacity onPress={() => setModalVisible(false)} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}><X size={20} color={theme.textDim} /></TouchableOpacity>
+                            </View>
+
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                <View style={{ gap: 15 }}>
+                                    <InputGroup icon={FileText} label="Procedure Name *" value={formData.name} onChange={t => setFormData({...formData, name: t})} theme={theme} placeholder="e.g. Root Canal" />
+                                    
+                                    <View style={{ flexDirection: 'row', gap: 15 }}>
+                                        <View style={{ flex: 1 }}><InputGroup icon={Banknote || Tag} label="Cost (₹) *" value={formData.cost} onChange={t => setFormData({...formData, cost: t})} theme={theme} placeholder="500" keyboardType="numeric" /></View>
+                                        <View style={{ flex: 1 }}><InputGroup icon={Timer} label="Duration" value={formData.duration} onChange={t => setFormData({...formData, duration: t})} theme={theme} placeholder="e.g. 30 min" /></View>
+                                    </View>
+
+                                    <View>
+                                        <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Category</Text>
+                                        <TouchableOpacity onPress={() => setCategoryPickerVisible(true)} style={[styles.inputContainer, { backgroundColor: theme.cardBg, borderColor: theme.border, justifyContent: 'space-between', paddingRight: 15 }]}>
+                                            <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+                                                {(() => {
+                                                    const cat = getCategoryDetails(formData.category);
+                                                    const CatIcon = cat.icon;
+                                                    return <CatIcon size={20} color={cat.color} />;
+                                                })()}
+                                                <Text style={{ color: theme.text, fontSize: 16 }}>{formData.category}</Text>
+                                            </View>
+                                            <ChevronDown size={16} color={theme.textDim} />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <InputGroup icon={Clipboard} label="Notes / Description" value={formData.notes} onChange={t => setFormData({...formData, notes: t})} theme={theme} placeholder="Additional details..." multiline />
+                                </View>
+                            </ScrollView>
+
+                            <TouchableOpacity onPress={handleSave} style={{ marginTop: 25 }}>
+                                <LinearGradient colors={[theme.primary, theme.primaryDark]} style={{ padding: 18, borderRadius: 18, alignItems: 'center', shadowColor: theme.primary, shadowOffset: {width:0,height:5}, shadowOpacity:0.4, elevation:8 }}>
+                                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}>{isEditing ? 'Save Changes' : 'Add Procedure'}</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                         </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+            <CustomPicker visible={categoryPickerVisible} title="Select Category" data={PROCEDURE_CATEGORIES} onClose={() => setCategoryPickerVisible(false)} onSelect={(val) => setFormData({...formData, category: val})} theme={theme} colored={true} />
+        </View>
+    );
+};
+
+// --- SUPPORT SCREEN ---
+const SupportScreen = ({ theme, onBack }) => {
+    const insets = useSafeAreaInsets();
+    
+    // SuhaimSoft Data
+    const company = {
+        name: "SuhaimSoft",
+        email: "info@suhaimsoft.com",
+        phone: "+91 8891479505",
+        phoneClean: "918891479505"
+    };
+
+    // Developer Data
+    const developer = {
+        name: "Fouzan",
+        phone: "+91 90720 70473",
+        phoneClean: "919072070473",
+        email: "muhammedfauzan7862@gmail.com"
+    };
+
+    const handleCall = (number) => Linking.openURL(`tel:${number}`).catch(() => Alert.alert("Error", "Cannot place call"));
+    const handleEmail = (email) => Linking.openURL(`mailto:${email}`).catch(() => Alert.alert("Error", "Cannot open email app"));
+    const handleWhatsApp = (number) => Linking.openURL(`whatsapp://send?phone=${number}`).catch(() => Alert.alert("Error", "WhatsApp not installed"));
+
+    const ContactCard = ({ title, data, isDev = false }) => (
+        <View style={{ backgroundColor: theme.cardBg, borderRadius: 20, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: theme.border, shadowColor: "#000", shadowOffset: {width:0, height:5}, shadowOpacity: 0.1, elevation: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: isDev ? '#eff6ff' : '#ecfdf5', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                    {isDev ? <User size={22} color="#2563eb" /> : <Activity size={22} color="#10b981" />}
+                </View>
+                <View>
+                    <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 18 }}>{data.name}</Text>
+                    <Text style={{ color: theme.textDim, fontSize: 12 }}>{title}</Text>
+                </View>
+            </View>
+
+            <View style={{ gap: 12 }}>
+                <TouchableOpacity onPress={() => handleCall(data.phoneClean)} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: theme.inputBg, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
+                    <Phone size={18} color={theme.primary} style={{ marginRight: 12 }} />
+                    <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>{data.phone}</Text>
+                    <Text style={{ color: theme.primary, fontSize: 12, fontWeight: 'bold' }}>CALL</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity onPress={() => handleWhatsApp(data.phoneClean)} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: theme.inputBg, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
+                    <MessageCircle size={18} color="#25D366" style={{ marginRight: 12 }} />
+                    <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>WhatsApp Support</Text>
+                    <Text style={{ color: '#25D366', fontSize: 12, fontWeight: 'bold' }}>CHAT</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => handleEmail(data.email)} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: theme.inputBg, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
+                    <Mail size={18} color="#f59e0b" style={{ marginRight: 12 }} />
+                    <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>{data.email}</Text>
+                    <Text style={{ color: '#f59e0b', fontSize: 12, fontWeight: 'bold' }}>MAIL</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
+    return (
+        <View style={[styles.container, { backgroundColor: theme.bg }]}>
+            <View style={[styles.header, { marginTop: insets.top + 10 }]}>
+                <TouchableOpacity onPress={onBack} style={[styles.iconBtn, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+                    <ArrowLeft size={24} color={theme.text} />
+                </TouchableOpacity>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Support & Help</Text>
+                <View style={{ width: 44 }} />
+            </View>
+            
+            <ScrollView contentContainerStyle={{ padding: 20 }}>
+                <View style={{ alignItems: 'center', marginBottom: 30 }}>
+                    <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.inputBg, alignItems: 'center', justifyContent: 'center', marginBottom: 15, borderWidth: 1, borderColor: theme.border }}>
+                        <HelpCircle size={40} color={theme.primary} />
+                    </View>
+                    <Text style={{ color: theme.text, fontSize: 20, fontWeight: 'bold' }}>How can we help you?</Text>
+                    <Text style={{ color: theme.textDim, textAlign: 'center', marginTop: 5 }}>Contact our support team or developer directly for assistance.</Text>
+                </View>
+
+                <ContactCard title="Technical Support Team" data={company} />
+                <ContactCard title="Lead Developer" data={developer} isDev={true} />
+
+                <View style={{ marginTop: 20, alignItems: 'center' }}>
+                    <Text style={{ color: theme.textDim, fontSize: 12 }}>Suhaim Soft v2.0</Text>
+                </View>
+            </ScrollView>
+        </View>
+    );
+};
+
 // --- NEW TEMPLATE SCREEN (REPLACEMENT) ---
-// --- 3D COLORFUL RX PAD UI ---
-const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, setMedicines }) => {
+const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, setMedicines, showToast }) => {
     const insets = useSafeAreaInsets();
     const [view, setView] = useState('list'); // 'list', 'edit'
     const [searchQuery, setSearchQuery] = useState('');
@@ -277,7 +709,6 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
     const [medModalVisible, setMedModalVisible] = useState(false);
     const [medSearch, setMedSearch] = useState('');
     const [newMedForm, setNewMedForm] = useState({ name: '', dosage: '', freq: '1-0-1', duration: '3 Days', instruction: 'After Food', type: 'Tablet' });
-    const [activePicker, setActivePicker] = useState(null); 
 
     // Actions
     const handleEdit = (item) => {
@@ -296,11 +727,11 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         let updatedTemplates;
         if (editorForm.id) {
             updatedTemplates = templates.map(t => t.id === editorForm.id ? editorForm : t);
-            Alert.alert("Success", "Template Updated!");
+            showToast('Success', 'Template Updated Successfully!', 'success');
         } else {
             const newTemplate = { ...editorForm, id: Date.now() };
             updatedTemplates = [newTemplate, ...templates];
-            Alert.alert("Success", "Template Created!");
+            showToast('Success', 'New Template Created!', 'success');
         }
         setTemplates(updatedTemplates);
         setView('list');
@@ -309,6 +740,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
     const handleDeleteTemplate = (id) => {
         Alert.alert("Delete", "Remove this template?", [{text: "Cancel"}, {text: "Delete", style: 'destructive', onPress: () => {
             setTemplates(templates.filter(t => t.id !== id));
+            showToast('Deleted', 'Template removed.', 'error');
         }}]);
     };
 
@@ -339,7 +771,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         const newGlobalMed = { id: Date.now(), name: medSearch, type: newMedForm.type, content: newMedForm.dosage || 'N/A' };
         setMedicines([newGlobalMed, ...medicines]);
         setNewMedForm({ ...newMedForm, name: medSearch });
-        Alert.alert("Added", "Medicine added to Global Inventory.");
+        showToast('Success', 'Medicine added to Global Inventory', 'success');
     };
 
     const renderList = () => {
@@ -621,7 +1053,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
 // --- END TEMPLATE SCREEN ---
 
 // --- VITALS SCREEN ---
-const VitalsScreen = ({ theme, onBack, patient, onSaveVitals }) => {
+const VitalsScreen = ({ theme, onBack, patient, onSaveVitals, showToast }) => {
     const insets = useSafeAreaInsets();
     const [history, setHistory] = useState(patient?.vitalsHistory || []);
     const [editingId, setEditingId] = useState(null);
@@ -646,10 +1078,10 @@ const VitalsScreen = ({ theme, onBack, patient, onSaveVitals }) => {
         if (editingId) {
             updatedHistory = history.map(h => h.id === editingId ? newEntry : h);
             setEditingId(null);
-            Alert.alert("Updated", "Vitals record updated successfully.");
+            showToast('Success', 'Vitals Record Updated', 'success');
         } else {
             updatedHistory = [newEntry, ...history];
-            Alert.alert("Saved", "New vitals recorded.");
+            showToast('Saved', 'Vitals Recorded Successfully', 'success');
         }
 
         setHistory(updatedHistory);
@@ -673,6 +1105,7 @@ const VitalsScreen = ({ theme, onBack, patient, onSaveVitals }) => {
                 const updated = history.filter(h => h.id !== id);
                 setHistory(updated);
                 onSaveVitals(patient.id, updated);
+                showToast('Deleted', 'Vitals record removed', 'error');
             }}
         ]);
     };
@@ -856,7 +1289,7 @@ const VitalsScreen = ({ theme, onBack, patient, onSaveVitals }) => {
 };
 
 // --- PATIENT MANAGEMENT SCREEN ---
-const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, setAppointments, selectedPatientId, onBookAppointment, onNavigate }) => {
+const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, setAppointments, selectedPatientId, onBookAppointment, onNavigate, showToast }) => {
     const insets = useSafeAreaInsets();
     const [view, setView] = useState('list'); 
     const [searchQuery, setSearchQuery] = useState('');
@@ -890,6 +1323,7 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
                         const updated = patients.filter(p => p.id !== id);
                         setPatients(updated);
                         if(view !== 'list') setView('list');
+                        showToast('Deleted', 'Patient removed successfully.', 'error');
                     }}]
         );
     };
@@ -898,7 +1332,7 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
         if (!editForm.name || !editForm.mobile) { Alert.alert("Error", "Name and Mobile are required"); return; }
         const updated = patients.map(p => p.id === editForm.id ? editForm : p);
         setPatients(updated);
-        Alert.alert("Success", "Patient details updated.");
+        showToast('Success', 'Patient Details Updated!', 'success');
         setView('list');
     };
 
@@ -933,7 +1367,7 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
         setPatients([createdPatient, ...patients]);
         setAddVisible(false);
         setNewPatient({ name: '', mobile: '', email: '', age: '', dob: '', dobObj: new Date(), gender: 'M', blood: 'O+', address: '' });
-        Alert.alert("Success", "New Patient Added Successfully!");
+        showToast('Success', 'New Patient Added Successfully!', 'success');
     };
 
     const openPatientPopup = (patient) => {
@@ -1009,9 +1443,6 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
                             </View>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
-                             <TouchableOpacity onPress={() => handleQuickBook(item)} style={{ padding: 8, backgroundColor: theme.inputBg, borderRadius: 8, borderWidth: 1, borderColor: theme.border }}>
-                                <CalendarPlus size={18} color="#f59e0b" />
-                            </TouchableOpacity>
                             <TouchableOpacity onPress={() => openPatientPopup(item)} style={{ padding: 8, backgroundColor: theme.inputBg, borderRadius: 8 }}>
                                 <Eye size={18} color={theme.primary} />
                             </TouchableOpacity>
@@ -1132,7 +1563,7 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
             try { await Share.share({ message }); } catch (error) { Alert.alert("Error", "Could not share."); }
         };
 
-        const handleDownload = () => { Alert.alert("Success", "ID Card Image saved to Gallery!"); };
+        const handleDownload = () => { showToast('Success', 'ID Card Image Saved', 'success'); };
 
         const ACTIONS = [
             { id: 1, title: 'Add Vitals', icon: HeartPulse, colors: ['#2dd4bf', '#0f766e'], action: () => onNavigate('vitals', selectedPatient) },
@@ -1212,6 +1643,10 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
                     </View>
                     <View style={{ flex: 1 }}><InputGroup icon={Calendar} label="Age" keyboardType="numeric" value={editForm.age} onChange={t => setEditForm({...editForm, age: t})} theme={theme} /></View>
                 </View>
+                
+                {/* Gender Selector in Edit Mode */}
+                <GenderSelector value={editForm.gender} onChange={(val) => setEditForm({...editForm, gender: val})} theme={theme} />
+
                 <View style={{ marginTop: 10 }}>
                      <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Blood Group</Text>
                     <TouchableOpacity onPress={() => setPickerVisible(true)} style={[styles.inputContainer, { backgroundColor: theme.cardBg, borderColor: theme.border, justifyContent: 'space-between', paddingRight: 15 }]}>
@@ -1223,10 +1658,6 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
                     </TouchableOpacity>
                 </View>
                 <InputGroup icon={MapPin} label="Address" value={editForm.address} onChange={t => setEditForm({...editForm, address: t})} theme={theme} />
-                
-                <TouchableOpacity onPress={handleSaveEdit} style={{ backgroundColor: theme.primary, padding: 15, borderRadius: 12, alignItems: 'center', marginTop: 20 }}>
-                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Update Patient</Text>
-                </TouchableOpacity>
             </View>
             <CustomPicker visible={pickerVisible} title="Blood Group" data={BLOOD_GROUPS} onClose={() => setPickerVisible(false)} onSelect={(val) => {
                 setEditForm({...editForm, blood: val});
@@ -1279,6 +1710,10 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
                                         <InputGroup icon={Calendar} label="Age" keyboardType="numeric" value={newPatient.age} onChange={t => setNewPatient({...newPatient, age: t})} theme={theme} placeholder="Age" />
                                     </View>
                                 </View>
+
+                                {/* Gender Selector in Add Modal */}
+                                <GenderSelector value={newPatient.gender} onChange={(val) => setNewPatient({...newPatient, gender: val})} theme={theme} />
+
                                 <View>
                                     <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Blood Group</Text>
                                     <TouchableOpacity onPress={() => setPickerVisible(true)} style={[styles.inputContainer, { backgroundColor: theme.inputBg, borderColor: theme.border, justifyContent: 'space-between', paddingRight: 15 }]}>
@@ -1323,11 +1758,20 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
                 <Text style={[styles.headerTitle, { color: theme.text }]}>
                     {view === 'list' ? 'Patient List' : view === 'detail' ? 'Patient Profile' : 'Edit Patient'}
                 </Text>
+                
+                {/* Header Actions Logic */}
                 {view === 'list' ? (
                     <TouchableOpacity onPress={() => setAddVisible(true)} style={[styles.iconBtn, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
                         <Plus size={24} color="white" />
                     </TouchableOpacity>
-                ) : ( <View style={{ width: 44 }} /> )}
+                ) : view === 'edit' ? (
+                    // Small "Update" Button in Header
+                    <TouchableOpacity onPress={handleSaveEdit} style={[styles.iconBtn, { backgroundColor: '#10b981', borderColor: '#10b981' }]}>
+                        <Check size={24} color="white" />
+                    </TouchableOpacity>
+                ) : ( 
+                    <View style={{ width: 44 }} /> 
+                )}
             </View>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 {view === 'list' && renderList()}
@@ -1366,7 +1810,7 @@ const PlaceholderScreen = ({ title, icon: Icon, theme, onBack, color }) => {
 };
 
 // --- MEDICINE INVENTORY SCREEN ---
-const MedicineScreen = ({ theme, onBack, medicines, setMedicines }) => {
+const MedicineScreen = ({ theme, onBack, medicines, setMedicines, showToast }) => {
     const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState('All'); 
@@ -1423,9 +1867,11 @@ const MedicineScreen = ({ theme, onBack, medicines, setMedicines }) => {
         if (isEditing) {
             const updated = medicines.map(m => m.id === currentId ? { ...m, ...formData } : m);
             setMedicines(updated);
+            showToast('Success', 'Medicine Updated', 'success');
         } else {
             const newMed = { id: Date.now(), ...formData };
             setMedicines([newMed, ...medicines]);
+            showToast('Success', 'New Medicine Added', 'success');
         }
         setAddEditVisible(false);
     };
@@ -1433,7 +1879,10 @@ const MedicineScreen = ({ theme, onBack, medicines, setMedicines }) => {
     const handleDelete = (id) => {
         Alert.alert(
             "Delete Item", "Remove this medicine?",
-            [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: 'destructive', onPress: () => setMedicines(medicines.filter(m => m.id !== id)) }]
+            [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: 'destructive', onPress: () => {
+                setMedicines(medicines.filter(m => m.id !== id));
+                showToast('Deleted', 'Medicine removed.', 'error');
+            }}]
         );
     };
 
@@ -1651,7 +2100,7 @@ const MedicineScreen = ({ theme, onBack, medicines, setMedicines }) => {
 };
 
 // --- 4. APPOINTMENT SCREEN ---
-const AppointmentScreen = ({ theme, onBack, form, setForm, appointments, setAppointments, patients, setPatients, onSelectPatient, viewMode, setViewMode }) => {
+const AppointmentScreen = ({ theme, onBack, form, setForm, appointments, setAppointments, patients, setPatients, onSelectPatient, viewMode, setViewMode, showToast }) => {
     const insets = useSafeAreaInsets();
     const [activeTab, setActiveTab] = useState('upcoming');
     const [searchQuery, setSearchQuery] = useState('');
@@ -1693,7 +2142,7 @@ const AppointmentScreen = ({ theme, onBack, form, setForm, appointments, setAppo
         if (editingId) {
             const updated = appointments.map(a => a.id === editingId ? { ...a, ...appointmentData, status: 'upcoming' } : a);
             setAppointments(updated);
-            Alert.alert("Success", "Appointment Updated!");
+            showToast('Success', 'Appointment Updated', 'success');
         } else {
             const newAppt = { id: Date.now(), ...appointmentData, status: 'upcoming' };
             let newAppointments = [newAppt, ...appointments];
@@ -1710,9 +2159,9 @@ const AppointmentScreen = ({ theme, onBack, form, setForm, appointments, setAppo
                     status: 'pending'
                 };
                 newAppointments = [...newAppointments, followUpAppt];
-                Alert.alert("Success", "Appointment & Follow-up Created!");
+                showToast('Success', 'Appointment & Follow-up Created!', 'success');
             } else {
-                Alert.alert("Success", "Appointment Booked!");
+                showToast('Success', 'Appointment Booked Successfully!', 'success');
             }
             setAppointments(newAppointments);
             setActiveTab('upcoming');
@@ -1742,8 +2191,8 @@ const AppointmentScreen = ({ theme, onBack, form, setForm, appointments, setAppo
 
     const handleCall = (mobile) => Linking.openURL(`tel:${mobile}`);
     const handleWhatsApp = (mobile) => Linking.openURL(`whatsapp://send?phone=${mobile}&text=Hello, this is regarding your appointment.`);
-    const handleComplete = (id) => { Alert.alert("Completed", "Appointment marked as done."); const filtered = appointments.filter(a => a.id !== id); setAppointments(filtered); };
-    const handlePending = (id) => { const updated = appointments.map(a => a.id === id ? { ...a, status: 'pending' } : a); setAppointments(updated); Alert.alert("Pending", "Moved to Pending."); };
+    const handleComplete = (id) => { showToast('Completed', 'Appointment marked as done.', 'success'); const filtered = appointments.filter(a => a.id !== id); setAppointments(filtered); };
+    const handlePending = (id) => { const updated = appointments.map(a => a.id === id ? { ...a, status: 'pending' } : a); setAppointments(updated); showToast('Moved', 'Appointment moved to Pending.', 'info'); };
 
     const openDatePicker = (mode, currentVal) => {
         setPickerMode(mode);
@@ -1773,7 +2222,11 @@ const AppointmentScreen = ({ theme, onBack, form, setForm, appointments, setAppo
     };
 
     const handleDelete = (id) => {
-        Alert.alert("Delete Appointment", "Remove this booking?", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: 'destructive', onPress: () => { const filtered = appointments.filter(a => a.id !== id); setAppointments(filtered); }}]);
+        Alert.alert("Delete Appointment", "Remove this booking?", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: 'destructive', onPress: () => { 
+            const filtered = appointments.filter(a => a.id !== id); 
+            setAppointments(filtered);
+            showToast('Deleted', 'Appointment removed.', 'error');
+        }}]);
     };
 
     const handleEdit = (item) => {
@@ -1867,7 +2320,7 @@ const AppointmentScreen = ({ theme, onBack, form, setForm, appointments, setAppo
                     ) : (
                         <View style={{ alignItems: 'center', justifyContent: 'center', paddingTop: 60 }}>
                             <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.inputBg, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}><AlertCircle size={40} color={theme.textDim} /></View>
-                            <Text style={{ color: theme.text, fontSize: 18, fontWeight: 'bold' }}>No Appointments</Text>
+                            <Text style={{ color: theme.text, fontSize: 18, fontWeight: 'bold', color: theme.textDim }}>No Appointments</Text>
                             <Text style={{ color: theme.textDim, fontSize: 14 }}>Try searching or add new.</Text>
                         </View>
                     )}
@@ -1936,6 +2389,10 @@ const AppointmentScreen = ({ theme, onBack, form, setForm, appointments, setAppo
                     </View>
                     <View style={{ flex: 1 }}><InputGroup icon={Calendar} label="Age" keyboardType="numeric" value={form.age} onChange={t => setForm({...form, age: t})} theme={theme} /></View>
                 </View>
+
+                {/* Gender Selector in New Appointment */}
+                <GenderSelector value={form.gender} onChange={(val) => setForm({...form, gender: val})} theme={theme} />
+
                  <View style={{ marginTop: 5 }}>
                     <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Blood Group</Text>
                     <TouchableOpacity onPress={() => setPickerType('blood')} style={[styles.inputContainer, { backgroundColor: theme.cardBg, borderColor: theme.border, justifyContent: 'space-between', paddingRight: 15 }]}>
@@ -2069,7 +2526,7 @@ const InputGroup = ({ icon: Icon, label, value, onChange, theme, multiline, keyb
 );
 
 // --- 5. LOGIN SCREEN ---
-const LoginScreen = ({ onLogin, theme }) => {
+const LoginScreen = ({ onLogin, theme, showToast }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -2090,7 +2547,11 @@ const LoginScreen = ({ onLogin, theme }) => {
     const handleLoginPress = () => {
         if(!email || !password) { Alert.alert("Missing Info", "Please enter both Email and Password."); return; }
         setLoading(true);
-        setTimeout(() => { setLoading(false); onLogin(); }, 1500);
+        setTimeout(() => { 
+            setLoading(false); 
+            onLogin(); 
+            showToast('Welcome Back', 'Logged in successfully', 'success');
+        }, 1500);
     };
 
     return (
@@ -2149,47 +2610,155 @@ const LoginScreen = ({ onLogin, theme }) => {
     );
 };
 
-// 6. SIDE MENU
+// 6. SIDE MENU (IMPROVED 3D UI/UX)
 const SideMenu = ({ visible, onClose, insets, theme, onNavigate, onLogout }) => {
-  const slideAnim = useRef(new Animated.Value(-width * 0.8)).current;
-  useEffect(() => { 
-      if (visible) Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, bounciness: 5 }).start(); 
-      else Animated.timing(slideAnim, { toValue: -width * 0.8, duration: 300, useNativeDriver: true }).start(); 
+  // Animation Value: 0 = Closed, 1 = Open
+  const animValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+      Animated.spring(animValue, {
+          toValue: visible ? 1 : 0,
+          useNativeDriver: true,
+          damping: 15,
+          stiffness: 120,
+          mass: 0.8,
+          overshootClamping: false
+      }).start();
   }, [visible]);
 
   const handleLogoutPress = () => { Alert.alert("Logout", "Are you sure you want to end your session?", [{ text: "Cancel", style: "cancel" }, { text: "Logout", style: 'destructive', onPress: () => { onClose(); onLogout(); } }]); };
 
-  if (!visible) return null;
+  // 3D Interpolations
+  const translateX = animValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-width * 0.8, 0] // Slide in from left
+  });
+  
+  const rotateY = animValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['-90deg', '0deg'] // Swing open like a door
+  });
+
+  const opacity = animValue.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0, 0.5, 1]
+  });
+
+  const backdropOpacity = animValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 0.5]
+  });
+
+  if (!visible && animValue._value === 0) return null;
+
   return (
-    <View style={[styles.menuOverlay, { zIndex: 999 }]}>
-      <TouchableOpacity style={styles.menuBackdrop} onPress={onClose} activeOpacity={1} />
-      <Animated.View style={[styles.menuSidebar, { paddingTop: insets.top, backgroundColor: theme.cardBg, borderRightColor: theme.border, transform: [{ translateX: slideAnim }] }]}>
+    <View style={[styles.menuOverlay, { zIndex: 999, pointerEvents: visible ? 'auto' : 'none' }]}>
+      {/* Backdrop */}
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: backdropOpacity }]}>
+         <TouchableOpacity style={{flex: 1}} onPress={onClose} activeOpacity={1} />
+      </Animated.View>
+
+      {/* 3D Sidebar Container */}
+      <Animated.View style={[
+          styles.menuSidebar, 
+          { 
+              paddingTop: insets.top, 
+              backgroundColor: theme.cardBg, 
+              borderRightColor: theme.border,
+              transform: [
+                  { perspective: 1000 }, // Key to 3D effect
+                  { translateX },
+                  { rotateY },
+              ],
+              opacity,
+              shadowColor: "#000",
+              shadowOffset: { width: 10, height: 0 },
+              shadowOpacity: 0.3,
+              shadowRadius: 20,
+              elevation: 20
+          }
+      ]}>
+        {/* Gradient Background for Glass Effect */}
+        <LinearGradient 
+            colors={theme.mode === 'dark' ? ['rgba(255,255,255,0.03)', 'transparent'] : ['rgba(255,255,255,0.8)', 'rgba(255,255,255,0.4)']} 
+            style={StyleSheet.absoluteFill} 
+            start={{x:0, y:0}} end={{x:1, y:0}}
+        />
+
         <View style={styles.menuHeader}>
             <View style={{flexDirection:'row', alignItems:'center', gap:10}}>
-                <View style={{width:40, height:40, borderRadius:20, backgroundColor:theme.primary, alignItems:'center', justifyContent:'center'}}><User color="white" size={20} /></View>
-                <View><Text style={{color:theme.text, fontWeight:'bold'}}>Dr. Mansoor Ali.VP</Text><Text style={{color:theme.textDim, fontSize:12}}>Cardiologist</Text></View>
+                <LinearGradient colors={theme.mode === 'dark' ? [theme.primary, theme.primaryDark] : [theme.primary, theme.primaryDark]} style={{width:45, height:45, borderRadius:22.5, alignItems:'center', justifyContent:'center'}}>
+                    <User color="white" size={22} />
+                </LinearGradient>
+                <View>
+                    <Text style={{color:theme.text, fontWeight:'bold', fontSize: 16}}>Dr. Mansoor Ali.VP</Text>
+                    <Text style={{color:theme.textDim, fontSize:12, fontWeight: '600'}}>Cardiologist</Text>
+                </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: theme.inputBg }]}><X size={20} color={theme.text} /></TouchableOpacity>
+            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: theme.inputBg, borderRadius: 20 }]}>
+                <X size={20} color={theme.text} />
+            </TouchableOpacity>
         </View>
-        <ScrollView style={styles.menuItems} showsVerticalScrollIndicator={false}>
-            <Text style={[styles.menuSectionTitle, { color: theme.textDim }]}>Management</Text>
+        
+        <ScrollView style={styles.menuItems} showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 40}}>
+            <Text style={[styles.menuSectionTitle, { color: theme.textDim, paddingLeft: 10 }]}>Management</Text>
             {FEATURES.map((item, index) => { 
                 const Icon = item.icon; 
+                // Staggered animation for list items
+                const itemTranslateX = animValue.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-50 * (index + 1), 0]
+                });
+                
                 return (
-                    <TouchableOpacity key={index} style={[styles.menuFeatureItem, { borderBottomColor: theme.border }]} onPress={() => { onClose(); onNavigate(item.action); }}>
-                        <View style={[styles.menuFeatureIconBox, { backgroundColor: theme.inputBg }]}><Icon size={20} color={theme.primary} /></View>
-                        <View style={{ flex: 1 }}><Text style={[styles.menuItemText, { color: theme.text, fontWeight: '600' }]}>{item.title}</Text></View>
-                        <ChevronRight size={16} color={theme.textDim} />
-                    </TouchableOpacity>
+                    <Animated.View key={index} style={{ transform: [{ translateX: itemTranslateX }] }}>
+                        <TouchableOpacity 
+                            style={[styles.menuFeatureItem, { 
+                                borderBottomColor: 'transparent', 
+                                backgroundColor: 'transparent',
+                                marginVertical: 2,
+                                borderRadius: 12,
+                                paddingHorizontal: 10
+                            }]} 
+                            onPress={() => { onClose(); onNavigate(item.action); }}
+                        >
+                            <LinearGradient colors={item.color} style={{width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 15}} start={{x:0,y:0}} end={{x:1,y:1}}>
+                                <Icon size={18} color="white" />
+                            </LinearGradient>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.menuItemText, { color: theme.text, fontWeight: '700', fontSize: 15 }]}>{item.title}</Text>
+                                <Text style={{ color: theme.textDim, fontSize: 11 }}>{item.subtitle}</Text>
+                            </View>
+                            <ChevronRight size={16} color={theme.textDim} />
+                        </TouchableOpacity>
+                    </Animated.View>
                 )
             })}
+            
             <View style={[styles.menuDivider, { backgroundColor: theme.border }]} />
-            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: theme.border }]} onPress={handleLogoutPress}>
+            
+             {/* NEW SUPPORT SECTION */}
+             <TouchableOpacity 
+                style={[styles.menuItem, { borderBottomColor: 'transparent', paddingHorizontal: 10, marginBottom: 10 }]} 
+                onPress={() => { onClose(); onNavigate('support'); }}
+            >
                 <View style={{flexDirection: 'row', alignItems: 'center', gap: 15}}>
-                    <View style={[styles.menuFeatureIconBox, { backgroundColor: '#fee2e2' }]}><LogOut size={20} color="#ef4444" /></View>
+                    <View style={[styles.menuFeatureIconBox, { backgroundColor: theme.inputBg, borderRadius: 12, borderWidth: 1, borderColor: theme.border }]}>
+                        <HelpCircle size={20} color={theme.primary} />
+                    </View>
+                    <Text style={[styles.menuItemText, { color: theme.text, fontWeight: '600' }]}>Support & Help</Text>
+                </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: 'transparent', paddingHorizontal: 10 }]} onPress={handleLogoutPress}>
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: 15}}>
+                    <View style={[styles.menuFeatureIconBox, { backgroundColor: '#fee2e2', borderRadius: 12 }]}>
+                        <LogOut size={20} color="#ef4444" />
+                    </View>
                     <Text style={[styles.menuItemText, { color: '#ef4444', fontWeight: 'bold' }]}>Logout</Text>
                 </View>
             </TouchableOpacity>
+            
             <Text style={[styles.menuVersion, { color: theme.textDim }]}>Suhaim Soft v2.1.0</Text>
         </ScrollView>
       </Animated.View>
@@ -2224,6 +2793,12 @@ const MainApp = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedPatientId, setSelectedPatientId] = useState(null);
     const [appointmentScreenMode, setAppointmentScreenMode] = useState('list'); 
+    
+    // --- TOAST STATE ---
+    const [toast, setToast] = useState({ visible: false, title: '', message: '', type: 'success' });
+    const showToast = (title, message, type = 'success') => {
+        setToast({ visible: true, title, message, type });
+    };
 
     // --- STATE PERSISTENCE ---
     const [appointmentForm, setAppointmentForm] = useState(INITIAL_FORM_STATE);
@@ -2231,6 +2806,7 @@ const MainApp = () => {
     const [patients, setPatients] = useState(INITIAL_PATIENTS); 
     const [medicines, setMedicines] = useState(INITIAL_MEDICINES); 
     const [templates, setTemplates] = useState(INITIAL_TEMPLATES);
+    const [procedures, setProcedures] = useState(INITIAL_PROCEDURES);
 
     const theme = isDarkMode ? THEMES.dark : THEMES.light;
     const heroAnim = useRef(new Animated.Value(0)).current;
@@ -2299,12 +2875,10 @@ const MainApp = () => {
                                   <Text style={[styles.timeText, { color: theme.primary }]}>{getFormattedTime()}</Text>
                               </View>
                           </View>
+                          {/* MENU BUTTON REMOVED FROM HERE, ONLY DARK MODE TOGGLE REMAINS */}
                           <View style={{ flexDirection: 'row', gap: 10 }}>
                               <TouchableOpacity style={[styles.iconBtn, { backgroundColor: theme.inputBg, borderColor: theme.border }]} onPress={() => setIsDarkMode(!isDarkMode)}>
                                   {isDarkMode ? <Sun size={22} color={theme.text} /> : <Moon size={22} color={theme.text} />}
-                              </TouchableOpacity>
-                              <TouchableOpacity style={[styles.iconBtn, { backgroundColor: theme.inputBg, borderColor: theme.border }]} onPress={() => setMenuVisible(true)}>
-                                  <Menu size={24} color={theme.text} />
                               </TouchableOpacity>
                           </View>
                         </View>
@@ -2378,6 +2952,7 @@ const MainApp = () => {
                     onSelectPatient={handleSelectPatientFromAppt}
                     viewMode={appointmentScreenMode} 
                     setViewMode={setAppointmentScreenMode} 
+                    showToast={showToast}
                 />;
             case 'patients': 
                 return <PatientScreen 
@@ -2396,11 +2971,12 @@ const MainApp = () => {
                         if (screen === 'vitals') { setSelectedPatientId(data.id); setCurrentScreen('vitals'); } 
                         else { setCurrentScreen(screen); }
                     }}
+                    showToast={showToast}
                 />;
             case 'vitals':
                 const patientForVitals = patients.find(p => p.id === selectedPatientId);
-                return <VitalsScreen theme={theme} onBack={() => setCurrentScreen('patients')} patient={patientForVitals} onSaveVitals={handleSaveVitals} />;
-            case 'medicines': return <MedicineScreen theme={theme} onBack={() => setCurrentScreen('home')} medicines={medicines} setMedicines={setMedicines} />;
+                return <VitalsScreen theme={theme} onBack={() => setCurrentScreen('patients')} patient={patientForVitals} onSaveVitals={handleSaveVitals} showToast={showToast} />;
+            case 'medicines': return <MedicineScreen theme={theme} onBack={() => setCurrentScreen('home')} medicines={medicines} setMedicines={setMedicines} showToast={showToast} />;
             case 'templates': 
                 return <TemplateScreen 
                     theme={theme} 
@@ -2409,10 +2985,19 @@ const MainApp = () => {
                     setTemplates={setTemplates}
                     medicines={medicines}
                     setMedicines={setMedicines}
+                    showToast={showToast}
                 />;
+            case 'procedures': 
+                return <ProceduresScreen 
+                    theme={theme} 
+                    onBack={() => setCurrentScreen('home')} 
+                    procedures={procedures}
+                    setProcedures={setProcedures}
+                    showToast={showToast}
+                />;
+            case 'support': return <SupportScreen theme={theme} onBack={() => setCurrentScreen('home')} />;
             case 'history': return <PlaceholderScreen title="Patients History" icon={Clock} color={['#8b5cf6', '#7c3aed']} theme={theme} onBack={() => setCurrentScreen('home')} />;
             case 'reports': return <PlaceholderScreen title="Lab Reports" icon={BookOpen} color={['#ec4899', '#db2777']} theme={theme} onBack={() => setCurrentScreen('home')} />;
-            case 'procedures': return <PlaceholderScreen title="Procedures" icon={Settings} color={['#6366f1', '#4f46e5']} theme={theme} onBack={() => setCurrentScreen('home')} />;
             default: return null;
         }
     };
@@ -2420,18 +3005,33 @@ const MainApp = () => {
     return (
         <View style={[styles.container, { backgroundColor: theme.bg }]}>
             <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.bg} />
+            
+            {/* TOAST NOTIFICATION RENDERED AT ROOT LEVEL */}
+            <ToastNotification 
+                visible={toast.visible} 
+                title={toast.title} 
+                message={toast.message} 
+                type={toast.type}
+                onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+                theme={theme}
+            />
+
             {isLoading && <SplashScreen theme={theme} onFinish={() => setIsLoading(false)} />}
-            {!isLoading && !isLoggedIn && <LoginScreen onLogin={handleLogin} theme={theme} />}
+            {!isLoading && !isLoggedIn && <LoginScreen onLogin={handleLogin} theme={theme} showToast={showToast} />}
             {!isLoading && isLoggedIn && (
                 <>
                     <View style={[styles.glowTop, { backgroundColor: theme.glowTop }]} />
                     <View style={[styles.glowBottom, { backgroundColor: theme.glowBottom }]} />
+                    
+                    {/* MENU OVERLAY */}
                     <SideMenu 
                         visible={menuVisible} onClose={() => setMenuVisible(false)} insets={insets} theme={theme} 
                         onNavigate={(screen) => { if (screen === 'patients') setSelectedPatientId(null); setCurrentScreen(screen); }} 
                         onLogout={handleLogout} 
                     />
+                    
                     {renderContent()}
+                    
                     <BlurView intensity={isDarkMode ? 30 : 80} tint={theme.blurTint} style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 15), borderTopColor: theme.border, backgroundColor: theme.navBg }]}>
                         <View style={[styles.bottomNavLine, { backgroundColor: theme.border }]} />
                         <TouchableOpacity style={styles.navItem} onPress={() => setCurrentScreen('home')}><Home size={24} color={currentScreen === 'home' ? theme.primary : theme.textDim} /><Text style={[styles.navText, { color: currentScreen === 'home' ? theme.primary : theme.textDim }]}>Home</Text></TouchableOpacity>
@@ -2502,4 +3102,43 @@ const styles = StyleSheet.create({
   menuSectionTitle: { fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 10, marginTop: 10 },
   menuFeatureItem: { flexDirection: 'row', alignItems: 'center', gap: 15, paddingVertical: 12, borderBottomWidth: 1 },
   menuFeatureIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  // TOAST STYLES
+  toastContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 20,
+    right: 20,
+    zIndex: 9999,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  toastGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)'
+  },
+  toastIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 15
+  },
+  toastTitle: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2
+  },
+  toastMessage: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13
+  }
 })
