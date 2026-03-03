@@ -1,4 +1,3 @@
-
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,7 +28,7 @@ import {
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // --- IMPORTS FOR EXCEL EXPORT ---
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system'; 
 import * as Sharing from 'expo-sharing';
 
 import {
@@ -59,7 +58,6 @@ import {
     FlaskConical,
     HeartPulse,
     HelpCircle,
-    History,
     Home,
     Layers,
     LayoutGrid,
@@ -187,9 +185,9 @@ const INITIAL_APPOINTMENTS = [
 ];
 
 const INITIAL_PATIENTS = [
-    { id: 101, name: "Sarah Jenkins", mobile: "9876543210", email: "sarah.j@example.com", age: "28", dob: "1996-01-10", gender: "F", blood: "A+", address: "New York, NY", registeredDate: "Jan 10, 2024", vitalsHistory: [] },
-    { id: 102, name: "Mike Ross", mobile: "9988776655", email: "mike.ross@law.com", age: "35", dob: "1989-02-01", gender: "M", blood: "O-", address: "Brooklyn, NY", registeredDate: "Feb 01, 2024", vitalsHistory: [] },
-    { id: 822, name: "Suhaim", mobile: "8891479505", email: "suhaim@example.com", age: "18", dob: "2006-05-15", gender: "M", blood: "O+", address: "Pathappiriyam", registeredDate: "Feb 19, 2026", vitalsHistory: [] },
+    { id: 101, name: "Sarah Jenkins", mobile: "9876543210", email: "sarah.j@example.com", age: "28", dob: "1996-01-10", gender: "F", blood: "A+", address: "New York, NY", registeredDate: "Jan 10, 2024", vitalsHistory: [ { id: 1, date: new Date().toISOString(), sys: '120', dia: '80', pulse: '72', weight: '65', temp: '36.6', tempUnit: 'C' } ], rxHistory: [] },
+    { id: 102, name: "Mike Ross", mobile: "9988776655", email: "mike.ross@law.com", age: "35", dob: "1989-02-01", gender: "M", blood: "O-", address: "Brooklyn, NY", registeredDate: "Feb 01, 2024", vitalsHistory: [], rxHistory: [] },
+    { id: 822, name: "Suhaim", mobile: "8891479505", email: "suhaim@example.com", age: "18", dob: "2006-05-15", gender: "M", blood: "O+", address: "Pathappiriyam", registeredDate: "Feb 19, 2026", vitalsHistory: [], rxHistory: [] },
 ];
 
 const PROCEDURE_CATEGORIES = [
@@ -218,7 +216,8 @@ const INITIAL_TEMPLATES = [
         medicines: [
             { id: 1, name: "Paracetamol", dosage: "1 Tablet (500mg)", freq: "1-1-1", duration: "3 Days", instruction: "After Food", type: "Tablet" },
             { id: 2, name: "Vitamin C", dosage: "1 Tablet (500mg)", freq: "1-0-0", duration: "5 Days", instruction: "After Food", type: "Tablet" }
-        ] 
+        ],
+        procedures: []
     },
     { 
         id: 2, 
@@ -227,7 +226,8 @@ const INITIAL_TEMPLATES = [
         advice: "Apply hot pack on affected area. Avoid heavy lifting.",
         medicines: [
             { id: 3, name: "Ibuprofen", dosage: "1 Tablet (400mg)", freq: "1-0-1", duration: "3 Days", instruction: "After Food", type: "Tablet" }
-        ] 
+        ],
+        procedures: []
     },
 ];
 
@@ -374,7 +374,7 @@ const InputGroup = ({ icon: Icon, label, value, onChange, theme, multiline, keyb
     </View>
 );
 
-// --- PROCEDURES MANAGEMENT SCREEN (FIXED FOR EXCEL EXPORT) ---
+// --- PROCEDURES MANAGEMENT SCREEN (ENHANCED UI/UX) ---
 const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast }) => {
     const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState('');
@@ -383,16 +383,22 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
     const [formData, setFormData] = useState({ id: null, name: '', cost: '', duration: '', category: 'General', notes: '' });
     const [isEditing, setIsEditing] = useState(false);
 
+    // Animation for stats
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
     // Date Filter State
     const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); // Start of current month
     const [endDate, setEndDate] = useState(new Date());
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
 
-    // Filtering Logic (Date + Search)
+    useEffect(() => {
+        Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+    }, []);
+
+    // Filtering Logic
     const filteredProcedures = procedures.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase());
-        
         let matchesDate = true;
         if (p.date) {
             const pDate = new Date(p.date);
@@ -400,15 +406,14 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
             const end = new Date(endDate); end.setHours(23,59,59,999);
             matchesDate = pDate >= start && pDate <= end;
         }
-        
         return matchesSearch && matchesDate;
     });
 
-    // Calculate Total Amount
+    // Calculate Stats
     const totalAmount = filteredProcedures.reduce((sum, item) => sum + (parseFloat(item.cost) || 0), 0);
-
     const getCategoryDetails = (catName) => PROCEDURE_CATEGORIES.find(c => c.value === catName) || PROCEDURE_CATEGORIES[0];
 
+    // Actions
     const openAdd = () => {
         setFormData({ id: null, name: '', cost: '', duration: '', category: 'General', notes: '' });
         setIsEditing(false);
@@ -421,42 +426,27 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
         setModalVisible(true);
     };
 
-    // --- FIXED EXCEL EXPORT FUNCTION (Universal Sharing) ---
     const handleExport = async () => {
         try {
-            // Create CSV Content
             let csvContent = "ID,Name,Category,Cost,Duration,Date,Notes\n";
-            
             filteredProcedures.forEach(item => {
                 const dateStr = item.date ? new Date(item.date).toLocaleDateString() : '';
                 const cleanName = item.name.replace(/,/g, ' ');
                 const cleanNotes = item.notes ? item.notes.replace(/,/g, ' ') : '';
-                
                 csvContent += `${item.id},${cleanName},${item.category},${item.cost},${item.duration},${dateStr},${cleanNotes}\n`;
             });
-
-            // 1. Define file path in Cache/Document Directory (Safe on both Android/iOS)
             const fileName = `Procedures_Report_${new Date().getTime()}.csv`;
             const fileUri = FileSystem.documentDirectory + fileName;
-
-            // 2. Write the file (Using string literal 'utf8' to avoid enum issues)
             await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
-
-            // 3. Share the file (This handles "Save to..." on Android and iOS automatically)
             if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(fileUri, {
-                    mimeType: 'text/csv',
-                    dialogTitle: 'Export Procedures Report',
-                    UTI: 'public.comma-separated-values-text'
-                });
+                await Sharing.shareAsync(fileUri, { mimeType: 'text/csv', dialogTitle: 'Export Procedures Report', UTI: 'public.comma-separated-values-text' });
                 showToast('Success', 'Export Dialog Opened', 'success');
             } else {
                 Alert.alert("Error", "Sharing is not available on this device");
             }
-
         } catch (error) {
             console.error("Export Error:", error);
-            Alert.alert("Export Failed", "Could not generate or share the file.");
+            Alert.alert("Export Failed", "Could not generate file.");
         }
     };
 
@@ -465,13 +455,11 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
             Alert.alert("Missing Information", "Procedure Name and Cost are required.");
             return;
         }
-
         if (isEditing) {
             const updated = procedures.map(p => p.id === formData.id ? formData : p);
             setProcedures(updated);
             showToast('Success', 'Procedure Updated Successfully', 'success');
         } else {
-            // Add current date to new procedure
             const newItem = { ...formData, id: Date.now(), date: new Date().toISOString() };
             setProcedures([newItem, ...procedures]);
             showToast('Success', 'New Procedure Added', 'success');
@@ -494,7 +482,6 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
         if (Platform.OS === 'android') setShowStartPicker(false);
         if (selectedDate) setStartDate(selectedDate);
     };
-
     const onEndDateChange = (event, selectedDate) => {
         if (Platform.OS === 'android') setShowEndPicker(false);
         if (selectedDate) setEndDate(selectedDate);
@@ -502,17 +489,15 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
 
     return (
         <View style={[styles.container, { backgroundColor: theme.bg }]}>
-             <View style={[styles.header, { marginTop: insets.top + 10 }]}>
+            <View style={[styles.header, { marginTop: insets.top + 10 }]}>
                 <TouchableOpacity onPress={onBack} style={[styles.iconBtn, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
                     <ArrowLeft size={24} color={theme.text} />
                 </TouchableOpacity>
                 <View style={{flex: 1, paddingHorizontal: 15}}>
-                    <Text style={[styles.headerTitle, { color: theme.text }]}>Medical Procedures</Text>
-                    <Text style={{ fontSize: 12, color: theme.textDim }}>Manage services & pricing</Text>
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>Procedures & Services</Text>
+                    <Text style={{ fontSize: 12, color: theme.textDim }}>Manage pricing & revenue</Text>
                 </View>
-                
-                {/* Header Buttons: Export & Add */}
-                <View style={{flexDirection: 'row', gap: 10}}>
+                <View style={{flexDirection: 'row', gap: 8}}>
                     <TouchableOpacity onPress={handleExport} style={[styles.iconBtn, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
                         <FileSpreadsheet size={22} color="#10b981" /> 
                     </TouchableOpacity>
@@ -523,31 +508,27 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
             </View>
 
             <View style={{ paddingHorizontal: 20, marginBottom: 15 }}>
-                {/* Search Bar */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.cardBg, borderRadius: 14, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: theme.border, shadowColor: "#000", shadowOpacity: 0.05, elevation: 2, marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.cardBg, borderRadius: 16, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: theme.border, shadowColor: "#000", shadowOpacity: 0.05, elevation: 2, marginBottom: 10 }}>
                     <Search size={20} color={theme.textDim} style={{ marginRight: 10 }} />
-                    <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} placeholder="Search procedures..." placeholderTextColor={theme.textDim} value={searchQuery} onChangeText={setSearchQuery} />
+                    <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} placeholder="Search procedure name or category..." placeholderTextColor={theme.textDim} value={searchQuery} onChangeText={setSearchQuery} />
                     {searchQuery.length > 0 && <TouchableOpacity onPress={() => setSearchQuery('')}><X size={18} color={theme.textDim} /></TouchableOpacity>}
                 </View>
-
-                {/* Date Filter */}
                 <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TouchableOpacity onPress={() => setShowStartPicker(true)} style={{ flex: 1, backgroundColor: theme.inputBg, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                         <View style={{flexDirection:'row', alignItems:'center', gap:5}}>
+                    <TouchableOpacity onPress={() => setShowStartPicker(true)} style={{ flex: 1, backgroundColor: theme.inputBg, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                         <View style={{flexDirection:'row', alignItems:'center', gap:8}}>
                              <Calendar size={16} color={theme.textDim} />
                              <View>
-                                <Text style={{fontSize: 10, color: theme.textDim}}>From</Text>
+                                <Text style={{fontSize: 10, color: theme.textDim, fontWeight:'600', textTransform:'uppercase'}}>From</Text>
                                 <Text style={{fontSize: 12, fontWeight:'bold', color: theme.text}}>{startDate.toLocaleDateString()}</Text>
                              </View>
                          </View>
                          <ChevronDown size={14} color={theme.textDim} />
                     </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => setShowEndPicker(true)} style={{ flex: 1, backgroundColor: theme.inputBg, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                         <View style={{flexDirection:'row', alignItems:'center', gap:5}}>
+                    <TouchableOpacity onPress={() => setShowEndPicker(true)} style={{ flex: 1, backgroundColor: theme.inputBg, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                         <View style={{flexDirection:'row', alignItems:'center', gap:8}}>
                              <Calendar size={16} color={theme.textDim} />
                              <View>
-                                <Text style={{fontSize: 10, color: theme.textDim}}>To</Text>
+                                <Text style={{fontSize: 10, color: theme.textDim, fontWeight:'600', textTransform:'uppercase'}}>To</Text>
                                 <Text style={{fontSize: 12, fontWeight:'bold', color: theme.text}}>{endDate.toLocaleDateString()}</Text>
                              </View>
                          </View>
@@ -556,24 +537,38 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}>
-                 {/* Stats Cards including Total Amount */}
-                 <View style={{flexDirection: 'row', gap: 10, marginBottom: 20}}>
-                     <View style={{flex: 1, backgroundColor: theme.cardBg, padding: 15, borderRadius: 12, borderWidth: 1, borderColor: theme.border, alignItems: 'center'}}>
-                         <Text style={{color: theme.text, fontWeight: 'bold', fontSize: 20}}>{filteredProcedures.length}</Text>
-                         <Text style={{color: theme.textDim, fontSize: 11}}>Count</Text>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+                 <Animated.View style={{flexDirection: 'row', gap: 12, marginBottom: 20, opacity: fadeAnim, transform: [{ translateY: fadeAnim.interpolate({inputRange:[0,1], outputRange:[20,0]}) }] }}>
+                     <View style={{flex: 1, borderRadius: 16, overflow: 'hidden', shadowColor: "#3b82f6", shadowOffset: {width:0, height:5}, shadowOpacity: 0.2, elevation: 5}}>
+                        <LinearGradient colors={['#3b82f6', '#2563eb']} style={{ padding: 15, height: 100, justifyContent: 'space-between' }}>
+                             <View style={{flexDirection: 'row', justifyContent:'space-between', alignItems:'flex-start'}}>
+                                <View style={{backgroundColor: 'rgba(255,255,255,0.2)', padding:6, borderRadius:8}}><Layers size={18} color="white" /></View>
+                                <Text style={{color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: 'bold'}}>TOTAL COUNT</Text>
+                             </View>
+                             <Text style={{color: 'white', fontWeight: 'bold', fontSize: 26}}>{filteredProcedures.length}</Text>
+                        </LinearGradient>
                      </View>
-                     <View style={{flex: 1, backgroundColor: theme.cardBg, padding: 15, borderRadius: 12, borderWidth: 1, borderColor: theme.border, alignItems: 'center'}}>
-                         <Text style={{color: '#10b981', fontWeight: 'bold', fontSize: 20}}>₹{totalAmount.toLocaleString()}</Text>
-                         <Text style={{color: theme.textDim, fontSize: 11}}>Total Amount</Text>
+                     <View style={{flex: 1, borderRadius: 16, overflow: 'hidden', shadowColor: "#10b981", shadowOffset: {width:0, height:5}, shadowOpacity: 0.2, elevation: 5}}>
+                        <LinearGradient colors={['#10b981', '#059669']} style={{ padding: 15, height: 100, justifyContent: 'space-between' }}>
+                             <View style={{flexDirection: 'row', justifyContent:'space-between', alignItems:'flex-start'}}>
+                                <View style={{backgroundColor: 'rgba(255,255,255,0.2)', padding:6, borderRadius:8}}><Banknote size={18} color="white" /></View>
+                                <Text style={{color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: 'bold'}}>TOTAL REVENUE</Text>
+                             </View>
+                             <Text style={{color: 'white', fontWeight: 'bold', fontSize: 26}}>₹{totalAmount.toLocaleString()}</Text>
+                        </LinearGradient>
                      </View>
-                 </View>
+                 </Animated.View>
 
-                 {filteredProcedures.map((item) => {
+                 {filteredProcedures.map((item, index) => {
                      const cat = getCategoryDetails(item.category);
                      const CatIcon = cat.icon;
                      return (
-                         <View key={item.id} style={{ backgroundColor: theme.cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: theme.border, shadowColor: "#000", shadowOffset: {width:0, height:2}, shadowOpacity: 0.05, elevation: 2 }}>
+                         <Animated.View key={item.id} style={{ 
+                             backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, marginBottom: 12, 
+                             borderWidth: 1, borderColor: theme.border, 
+                             borderLeftWidth: 4, borderLeftColor: cat.color,
+                             shadowColor: "#000", shadowOffset: {width:0, height:2}, shadowOpacity: 0.05, elevation: 2 
+                         }}>
                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                                  <View style={{ flexDirection: 'row', gap: 12, flex: 1 }}>
                                      <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: cat.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -582,47 +577,59 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
                                      <View style={{ flex: 1 }}>
                                          <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text }}>{item.name}</Text>
                                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: cat.color }} />
-                                             <Text style={{ fontSize: 12, color: theme.textDim, fontWeight: '500' }}>{item.category}</Text>
+                                             <View style={{ backgroundColor: cat.bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                                 <Text style={{ fontSize: 10, color: cat.color, fontWeight: 'bold' }}>{item.category}</Text>
+                                             </View>
                                          </View>
                                      </View>
                                  </View>
                                  <View style={{ alignItems: 'flex-end' }}>
                                      <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.primary }}>₹{item.cost}</Text>
+                                     <Text style={{ fontSize: 11, color: theme.textDim }}>per unit</Text>
                                  </View>
                              </View>
                              
+                             {item.notes ? (
+                                <View style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 8, marginBottom: 10 }}>
+                                    <Text style={{ color: theme.textDim, fontSize: 12, fontStyle: 'italic' }} numberOfLines={2}>"{item.notes}"</Text>
+                                </View>
+                             ) : null}
+
                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: theme.border }}>
                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                      <Timer size={14} color={theme.textDim} />
-                                     <Text style={{ color: theme.textDim, fontSize: 12 }}>{item.duration || 'N/A'}</Text>
+                                     <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '500' }}>{item.duration || '15 min'}</Text>
                                      {item.date && (
                                          <Text style={{ color: theme.textDim, fontSize: 12, marginLeft: 5 }}>• {new Date(item.date).toLocaleDateString()}</Text>
                                      )}
                                  </View>
                                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                                     <TouchableOpacity onPress={() => openEdit(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                         <Pencil size={14} color={theme.textDim} />
-                                         <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textDim }}>Edit</Text>
+                                     <TouchableOpacity onPress={() => openEdit(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.inputBg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                                         <Pencil size={12} color={theme.textDim} />
+                                         <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textDim }}>Edit</Text>
                                      </TouchableOpacity>
-                                     <TouchableOpacity onPress={() => handleDelete(item.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                         <Trash2 size={14} color="#ef4444" />
-                                         <Text style={{ fontSize: 12, fontWeight: '600', color: "#ef4444" }}>Delete</Text>
+                                     <TouchableOpacity onPress={() => handleDelete(item.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#fee2e2', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                                         <Trash2 size={12} color="#ef4444" />
+                                         <Text style={{ fontSize: 11, fontWeight: '600', color: "#ef4444" }}>Delete</Text>
                                      </TouchableOpacity>
                                  </View>
                              </View>
-                         </View>
+                         </Animated.View>
                      );
                  })}
+
                  {filteredProcedures.length === 0 && (
-                    <View style={{ alignItems: 'center', marginTop: 40, opacity: 0.6 }}>
-                        <Settings size={40} color={theme.textDim} />
-                        <Text style={{ color: theme.textDim, marginTop: 10 }}>No procedures found in this range.</Text>
+                    <View style={{ alignItems: 'center', marginTop: 50, opacity: 0.6 }}>
+                        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.inputBg, alignItems: 'center', justifyContent: 'center', marginBottom: 15 }}>
+                            <Settings size={40} color={theme.textDim} />
+                        </View>
+                        <Text style={{ color: theme.text, fontSize: 16, fontWeight: 'bold' }}>No procedures found</Text>
+                        <Text style={{ color: theme.textDim, marginTop: 5 }}>Try adjusting your search or date range.</Text>
                     </View>
                  )}
             </ScrollView>
 
-            {/* ADD/EDIT MODAL */}
+            {/* --- ADD/EDIT MODAL --- */}
             <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                     <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
@@ -636,12 +643,10 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
                             <ScrollView showsVerticalScrollIndicator={false}>
                                 <View style={{ gap: 15 }}>
                                     <InputGroup icon={FileText} label="Procedure Name *" value={formData.name} onChange={t => setFormData({...formData, name: t})} theme={theme} placeholder="e.g. Root Canal" />
-                                    
                                     <View style={{ flexDirection: 'row', gap: 15 }}>
-                                        <View style={{ flex: 1 }}><InputGroup icon={Banknote || Tag} label="Cost (₹) *" value={formData.cost} onChange={t => setFormData({...formData, cost: t})} theme={theme} placeholder="500" keyboardType="numeric" /></View>
+                                        <View style={{ flex: 1 }}><InputGroup icon={Banknote} label="Cost (₹) *" value={formData.cost} onChange={t => setFormData({...formData, cost: t})} theme={theme} placeholder="500" keyboardType="numeric" /></View>
                                         <View style={{ flex: 1 }}><InputGroup icon={Timer} label="Duration" value={formData.duration} onChange={t => setFormData({...formData, duration: t})} theme={theme} placeholder="e.g. 30 min" /></View>
                                     </View>
-
                                     <View>
                                         <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Category</Text>
                                         <TouchableOpacity onPress={() => setCategoryPickerVisible(true)} style={[styles.inputContainer, { backgroundColor: theme.cardBg, borderColor: theme.border, justifyContent: 'space-between', paddingRight: 15 }]}>
@@ -656,7 +661,6 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
                                             <ChevronDown size={16} color={theme.textDim} />
                                         </TouchableOpacity>
                                     </View>
-
                                     <InputGroup icon={Clipboard} label="Notes / Description" value={formData.notes} onChange={t => setFormData({...formData, notes: t})} theme={theme} placeholder="Additional details..." multiline />
                                 </View>
                             </ScrollView>
@@ -672,7 +676,6 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
             </Modal>
             
             <CustomPicker visible={categoryPickerVisible} title="Select Category" data={PROCEDURE_CATEGORIES} onClose={() => setCategoryPickerVisible(false)} onSelect={(val) => setFormData({...formData, category: val})} theme={theme} colored={true} />
-            
             {showStartPicker && (
                 <DateTimePicker value={startDate} mode="date" display="default" onChange={onStartDateChange} />
             )}
@@ -686,23 +689,18 @@ const ProceduresScreen = ({ theme, onBack, procedures, setProcedures, showToast 
 // --- SUPPORT SCREEN ---
 const SupportScreen = ({ theme, onBack }) => {
     const insets = useSafeAreaInsets();
-    
-    // SuhaimSoft Data
     const company = {
         name: "SuhaimSoft",
         email: "info@suhaimsoft.com",
         phone: "+91 8891479505",
         phoneClean: "918891479505"
     };
-
-    // Developer Data
     const developer = {
         name: "Fouzan",
         phone: "+91 90720 70473",
         phoneClean: "919072070473",
         email: "muhammedfauzan7862@gmail.com"
     };
-
     const handleCall = (number) => Linking.openURL(`tel:${number}`).catch(() => Alert.alert("Error", "Cannot place call"));
     const handleEmail = (email) => Linking.openURL(`mailto:${email}`).catch(() => Alert.alert("Error", "Cannot open email app"));
     const handleWhatsApp = (number) => Linking.openURL(`whatsapp://send?phone=${number}`).catch(() => Alert.alert("Error", "WhatsApp not installed"));
@@ -718,20 +716,17 @@ const SupportScreen = ({ theme, onBack }) => {
                     <Text style={{ color: theme.textDim, fontSize: 12 }}>{title}</Text>
                 </View>
             </View>
-
             <View style={{ gap: 12 }}>
                 <TouchableOpacity onPress={() => handleCall(data.phoneClean)} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: theme.inputBg, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
                     <Phone size={18} color={theme.primary} style={{ marginRight: 12 }} />
                     <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>{data.phone}</Text>
                     <Text style={{ color: theme.primary, fontSize: 12, fontWeight: 'bold' }}>CALL</Text>
                 </TouchableOpacity>
-                
                 <TouchableOpacity onPress={() => handleWhatsApp(data.phoneClean)} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: theme.inputBg, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
                     <MessageCircle size={18} color="#25D366" style={{ marginRight: 12 }} />
                     <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>WhatsApp Support</Text>
                     <Text style={{ color: '#25D366', fontSize: 12, fontWeight: 'bold' }}>CHAT</Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity onPress={() => handleEmail(data.email)} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: theme.inputBg, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
                     <Mail size={18} color="#f59e0b" style={{ marginRight: 12 }} />
                     <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>{data.email}</Text>
@@ -750,7 +745,6 @@ const SupportScreen = ({ theme, onBack }) => {
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Support & Help</Text>
                 <View style={{ width: 44 }} />
             </View>
-            
             <ScrollView contentContainerStyle={{ padding: 20 }}>
                 <View style={{ alignItems: 'center', marginBottom: 30 }}>
                     <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.inputBg, alignItems: 'center', justifyContent: 'center', marginBottom: 15, borderWidth: 1, borderColor: theme.border }}>
@@ -759,10 +753,8 @@ const SupportScreen = ({ theme, onBack }) => {
                     <Text style={{ color: theme.text, fontSize: 20, fontWeight: 'bold' }}>How can we help you?</Text>
                     <Text style={{ color: theme.textDim, textAlign: 'center', marginTop: 5 }}>Contact our support team or developer directly for assistance.</Text>
                 </View>
-
                 <ContactCard title="Technical Support Team" data={company} />
                 <ContactCard title="Lead Developer" data={developer} isDev={true} />
-
                 <View style={{ marginTop: 20, alignItems: 'center' }}>
                     <Text style={{ color: theme.textDim, fontSize: 12 }}>Suhaim Soft v2.0</Text>
                 </View>
@@ -771,14 +763,15 @@ const SupportScreen = ({ theme, onBack }) => {
     );
 };
 
-// --- NEW TEMPLATE SCREEN (REPLACEMENT) ---
-const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, setMedicines, showToast }) => {
+// --- UPDATED TEMPLATE SCREEN WITH ENHANCED PROCEDURES UI ---
+const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, setMedicines, procedures, setProcedures, showToast, isPrescription = false, patient, onSavePrescription }) => {
     const insets = useSafeAreaInsets();
-    const [view, setView] = useState('list'); // 'list', 'edit'
+    const [view, setView] = useState('list'); 
     const [searchQuery, setSearchQuery] = useState('');
     
     // Editor State
-    const [editorForm, setEditorForm] = useState({ id: null, name: '', diagnosis: '', advice: '', medicines: [] });
+    const [editorForm, setEditorForm] = useState({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [] });
+    const [saveAsTemplate, setSaveAsTemplate] = useState(false);
     
     // View Modal State
     const [viewModalVisible, setViewModalVisible] = useState(false);
@@ -787,46 +780,92 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
     // Medicine Picker Modal State
     const [medModalVisible, setMedModalVisible] = useState(false);
     const [medSearch, setMedSearch] = useState('');
+
+    // --- NEW PROCEDURE STATES ---
+    const [procModalVisible, setProcModalVisible] = useState(false);
+    const [procSearch, setProcSearch] = useState('');
+    const [procViewMode, setProcViewMode] = useState('list'); // 'list' | 'add_master' | 'edit_master'
+    const [showCustomInput, setShowCustomInput] = useState(false);
     
-    // Manageable Options State (Dynamic Arrays)
+    // Form for Adding/Editing Master Procedure
+    const [masterProcForm, setMasterProcForm] = useState({ id: null, name: '', cost: '', category: 'General' });
+    
+    // Form for Custom Investigation (One-off)
+    const [customProcForm, setCustomProcForm] = useState({ name: '', cost: '' });
+
+    // Template Selection Modal for Rx Writer
+    const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+    
+    // Dynamic Arrays
     const [freqOptions, setFreqOptions] = useState(FREQUENCIES_INIT);
     const [durOptions, setDurOptions] = useState(DURATIONS_INIT);
     const [instrOptions, setInstrOptions] = useState(INSTRUCTIONS_INIT);
     const [doseOptions, setDoseOptions] = useState(DOSAGES_INIT);
 
-    // Custom Input Modal State (for Adding items)
+    // Input Modal State
     const [inputVisible, setInputVisible] = useState(false);
-    const [inputCategory, setInputCategory] = useState(null); // 'freq', 'dur', 'instr', 'dose'
+    const [inputCategory, setInputCategory] = useState(null);
     const [inputText, setInputText] = useState('');
-    const [editingItem, setEditingItem] = useState(null); // Used to track if editing existing item
-
-    // Updated Form State with inventory tracking and specific dose qty
+    const [editingItem, setEditingItem] = useState(null);
     const [newMedForm, setNewMedForm] = useState({ 
-        inventoryId: null, // To track if selected from inventory
-        name: '', 
-        content: '', // e.g. 500mg (Auto-filled)
-        type: 'Tablet', // e.g. Tablet (Auto-filled)
-        doseQty: '', // Empty by default
-        freq: '', // Empty by default
-        duration: '', // Empty by default 
-        instruction: '', // Empty by default
-        isTapering: false
+        inventoryId: null, name: '', content: '', type: 'Tablet', 
+        doseQty: '', freq: '', duration: '', instruction: '', isTapering: false
     });
+    const [editingMedIndex, setEditingMedIndex] = useState(null);
 
-    // Actions
+    useEffect(() => {
+        if (isPrescription) {
+            setView('edit');
+            setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [] });
+        }
+    }, [isPrescription]);
+
+    const applyTemplate = (template) => {
+        setEditorForm(prev => ({
+            ...prev,
+            diagnosis: template.diagnosis || prev.diagnosis,
+            advice: template.advice || prev.advice,
+            medicines: [...prev.medicines, ...template.medicines],
+            procedures: [...prev.procedures, ...(template.procedures || [])]
+        }));
+        setShowTemplatePicker(false);
+        showToast('Applied', `${template.name} loaded successfully`, 'info');
+    };
+
     const handleEdit = (item) => {
-        setEditorForm({ ...item, medicines: [...item.medicines] });
+        setEditorForm({ ...item, medicines: [...item.medicines], procedures: [...(item.procedures || [])] });
         setView('edit');
     };
 
     const handleCreate = () => {
-        setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [] });
+        setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [] });
         setView('edit');
     };
 
     const handleSaveTemplate = () => {
-        if (!editorForm.name) { Alert.alert("Required", "Please enter a Template Name."); return; }
+        if (!isPrescription && !editorForm.name) { Alert.alert("Required", "Please enter a Template Name."); return; }
         
+        if (isPrescription) {
+            if (editorForm.medicines.length === 0 && !editorForm.advice && editorForm.procedures.length === 0) {
+                Alert.alert("Empty", "Please add medicines, procedures, or advice."); return;
+            }
+            onSavePrescription({
+                ...editorForm,
+                patientId: patient.id,
+                date: new Date().toISOString()
+            });
+
+            if (saveAsTemplate && editorForm.name) {
+                 const newTemplate = { ...editorForm, id: Date.now() };
+                 setTemplates([newTemplate, ...templates]);
+                 showToast('Saved', 'Prescription & New Template Saved!', 'success');
+            } else if (saveAsTemplate && !editorForm.name) {
+                 Alert.alert("Template Name Required", "Please enter a Template Name to save this as a template.");
+                 return;
+            }
+            return;
+        }
+
         let updatedTemplates;
         if (editorForm.id) {
             updatedTemplates = templates.map(t => t.id === editorForm.id ? editorForm : t);
@@ -852,27 +891,101 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         setViewModalVisible(true);
     };
 
+    // --- PROCEDURE LOGIC START ---
+    
+    // Add item to prescription form
+    const addProcedureToForm = (proc) => {
+        setEditorForm(prev => ({
+             ...prev,
+             procedures: [...prev.procedures, { ...proc, id: Date.now() }]
+        }));
+        setProcModalVisible(false);
+        showToast('Added', 'Procedure added to prescription', 'success');
+    };
+
+    // Delete item from MASTER list
+    const handleDeleteMasterProcedure = (id) => {
+        Alert.alert("Delete", "Permanently remove from master list?", [
+            { text: "Cancel" },
+            { text: "Delete", style: 'destructive', onPress: () => {
+                setProcedures(procedures.filter(p => p.id !== id));
+                showToast('Deleted', 'Procedure removed from master list', 'error');
+            }}
+        ]);
+    };
+
+    // Save New/Edited Master Procedure
+    const handleSaveMasterProcedure = () => {
+        if(!masterProcForm.name || !masterProcForm.cost) {
+            Alert.alert("Missing Info", "Name and Price are required.");
+            return;
+        }
+        
+        if (masterProcForm.id) {
+            // Edit existing
+            const updated = procedures.map(p => p.id === masterProcForm.id ? masterProcForm : p);
+            setProcedures(updated);
+            showToast('Updated', 'Procedure updated successfully', 'success');
+        } else {
+            // Create new
+            const newProc = { ...masterProcForm, id: Date.now(), category: 'General' }; // Default category or could add picker
+            setProcedures([newProc, ...procedures]);
+            showToast('Created', 'New procedure added to master list', 'success');
+        }
+        setProcViewMode('list');
+    };
+
+    // Add One-Off Custom Procedure to Rx
+    const addCustomToRx = () => {
+        if (!customProcForm.name || !customProcForm.cost) {
+            Alert.alert("Missing Info", "Name and Price are required");
+            return;
+        }
+        const customProc = {
+            id: Date.now(),
+            name: customProcForm.name,
+            cost: customProcForm.cost,
+            category: 'Custom'
+        };
+        addProcedureToForm(customProc);
+        setCustomProcForm({ name: '', cost: '' });
+        setShowCustomInput(false);
+    };
+
+    const removeProcedureFromRx = (index) => {
+        const updated = [...editorForm.procedures];
+        updated.splice(index, 1);
+        setEditorForm({ ...editorForm, procedures: updated });
+    };
+
+    const calculateTotalCost = () => {
+        return editorForm.procedures.reduce((acc, curr) => acc + (parseFloat(curr.cost) || 0), 0);
+    };
+
+    const openAddMasterProc = () => {
+        setMasterProcForm({ id: null, name: '', cost: '', category: 'General' });
+        setProcViewMode('add_master');
+    };
+
+    const openEditMasterProc = (item) => {
+        setMasterProcForm({ ...item });
+        setProcViewMode('edit_master');
+    };
+    // --- PROCEDURE LOGIC END ---
+
     const removeMedFromTemplate = (index) => {
         const updated = [...editorForm.medicines];
         updated.splice(index, 1);
         setEditorForm({ ...editorForm, medicines: updated });
     };
 
-    // --- MEDICINE EDIT FUNCTIONALITY INSIDE TEMPLATE ---
-    const [editingMedIndex, setEditingMedIndex] = useState(null);
-
     const handleEditMedInTemplate = (index) => {
         const med = editorForm.medicines[index];
         setNewMedForm({
             inventoryId: med.inventoryId || null,
-            name: med.name,
-            content: med.content,
-            type: med.type,
-            doseQty: med.doseQty || '', // Needs to be preserved in structure
-            freq: med.freq,
-            duration: med.duration,
-            instruction: med.instruction,
-            isTapering: med.isTapering || false
+            name: med.name, content: med.content, type: med.type,
+            doseQty: med.doseQty || '', freq: med.freq, duration: med.duration,
+            instruction: med.instruction, isTapering: med.isTapering || false
         });
         setEditingMedIndex(index);
         setMedModalVisible(true);
@@ -880,17 +993,9 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
 
     const openMedModal = () => {
         setEditingMedIndex(null);
-        // Reset form
         setNewMedForm({ 
-            inventoryId: null,
-            name: '', 
-            content: '', 
-            type: 'Tablet', 
-            doseQty: '', 
-            freq: '', 
-            duration: '', 
-            instruction: '',
-            isTapering: false
+            inventoryId: null, name: '', content: '', type: 'Tablet', 
+            doseQty: '', freq: '', duration: '', instruction: '', isTapering: false
         });
         setMedSearch('');
         setMedModalVisible(true);
@@ -898,21 +1003,14 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
 
     const addMedToTemplate = () => {
         if (!newMedForm.name) return;
-        
-        // Construct display string for dosage
         let finalDosage = '';
         if (newMedForm.isTapering) {
             finalDosage = "Tapering Dose";
         } else {
-            if(!newMedForm.doseQty) {
-                 Alert.alert("Select Dosage", "Please select a Dose Amount."); return; 
-            }
+            if(!newMedForm.doseQty) { Alert.alert("Select Dosage", "Please select a Dose Amount."); return; }
             finalDosage = `${newMedForm.doseQty} (${newMedForm.content})`;
         }
-
-        if(!newMedForm.freq || !newMedForm.duration) {
-             Alert.alert("Missing Details", "Please select Frequency and Duration."); return;
-        }
+        if(!newMedForm.freq || !newMedForm.duration) { Alert.alert("Missing Details", "Please select Frequency and Duration."); return; }
 
         const medObject = { 
             ...newMedForm, 
@@ -925,40 +1023,25 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
             updatedMeds[editingMedIndex] = medObject;
             setEditorForm({ ...editorForm, medicines: updatedMeds });
         } else {
-            setEditorForm({ 
-                ...editorForm, 
-                medicines: [...editorForm.medicines, medObject] 
-            });
+            setEditorForm({ ...editorForm, medicines: [...editorForm.medicines, medObject] });
         }
         setMedModalVisible(false);
     };
 
-    // UPDATED: Logic to Auto-Fill and Lock fields
     const selectInventoryMed = (med) => {
         setNewMedForm({ 
-            ...newMedForm, 
-            inventoryId: med.id, // Mark as inventory item
-            name: med.name, 
-            type: med.type, 
-            content: med.content,
-            doseQty: '', // Reset dose quantity for fresh entry
-            isTapering: false
+            ...newMedForm, inventoryId: med.id, name: med.name, type: med.type, content: med.content,
+            doseQty: '', isTapering: false
         });
-        setMedSearch(''); // Clear search
+        setMedSearch('');
     };
 
     const clearSelection = () => {
         setNewMedForm({
-            ...newMedForm,
-            inventoryId: null,
-            name: '',
-            content: '',
-            type: 'Tablet',
-            isTapering: false
+            ...newMedForm, inventoryId: null, name: '', content: '', type: 'Tablet', isTapering: false
         });
     };
 
-    // --- MANAGEABLE LIST LOGIC (TO-DO STYLE) ---
     const openAddInput = (category, isEdit = false, value = '') => {
         setInputCategory(category);
         setInputText(value);
@@ -968,22 +1051,14 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
 
     const handleAddItem = () => {
         if (!inputText.trim()) { setInputVisible(false); return; }
-        
         const updateList = (list, setList) => {
-            if (editingItem) {
-                // Edit Mode
-                setList(list.map(i => i === editingItem ? inputText : i));
-            } else {
-                // Add Mode
-                setList([...list, inputText]);
-            }
+            if (editingItem) { setList(list.map(i => i === editingItem ? inputText : i)); } 
+            else { setList([...list, inputText]); }
         };
-
         if (inputCategory === 'freq') updateList(freqOptions, setFreqOptions);
         else if (inputCategory === 'dur') updateList(durOptions, setDurOptions);
         else if (inputCategory === 'instr') updateList(instrOptions, setInstrOptions);
         else if (inputCategory === 'dose') updateList(doseOptions, setDoseOptions);
-
         setInputVisible(false);
     };
 
@@ -995,15 +1070,11 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
     };
 
     const handleLongPressItem = (category, item) => {
-        Alert.alert(
-            "Manage Item",
-            `Choose action for "${item}"`,
-            [
-                { text: "Cancel", style: "cancel" },
-                { text: "Edit", onPress: () => openAddInput(category, true, item) },
-                { text: "Delete", style: "destructive", onPress: () => handleDeleteItem(category, item) }
-            ]
-        );
+        Alert.alert("Manage Item", `Choose action for "${item}"`, [
+            { text: "Cancel", style: "cancel" },
+            { text: "Edit", onPress: () => openAddInput(category, true, item) },
+            { text: "Delete", style: "destructive", onPress: () => handleDeleteItem(category, item) }
+        ]);
     };
 
     const renderList = () => {
@@ -1038,7 +1109,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                                     <View style={{ gap: 8 }}>
                                         {item.medicines.slice(0, 2).map((med, idx) => (
                                             <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: theme.inputBg, padding: 8, borderRadius: 8 }}>
-                                                <Pill size={14} color={theme.textDim} />
+                                                <Pencil size={14} color={theme.textDim} />
                                                 <Text style={{ color: theme.textDim, fontSize: 12, flex: 1, fontWeight: '500' }}>
                                                     {med.name} <Text style={{ fontSize: 10 }}>({med.dosage})</Text>
                                                 </Text>
@@ -1061,31 +1132,101 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         );
     };
 
+    const renderVitalsSummary = () => {
+        const latestVitals = patient?.vitalsHistory && patient.vitalsHistory.length > 0 ? patient.vitalsHistory[0] : null;
+        if (!latestVitals) return (
+            <View style={{marginBottom: 20, backgroundColor: theme.inputBg, padding: 12, borderRadius: 12, flexDirection:'row', alignItems:'center', gap: 10, borderStyle:'dashed', borderWidth:1, borderColor: theme.border}}>
+                <Activity size={20} color={theme.textDim} />
+                <Text style={{color: theme.textDim, fontSize: 13}}>No vitals recorded for this patient.</Text>
+            </View>
+        );
+        const VitalItem = ({ label, value, unit, icon: Icon, color }) => (
+            <View style={{backgroundColor: theme.cardBg, borderRadius: 10, padding: 8, flex: 1, alignItems:'center', borderWidth: 1, borderColor: theme.border, minWidth: 70}}>
+                <View style={{flexDirection:'row', alignItems:'center', gap: 4, marginBottom: 4}}>
+                    <Icon size={12} color={color} />
+                    <Text style={{fontSize: 10, color: theme.textDim, fontWeight:'bold', textTransform:'uppercase'}}>{label}</Text>
+                </View>
+                <Text style={{fontSize: 14, fontWeight:'bold', color: theme.text}}>{value || '--'} <Text style={{fontSize: 10, fontWeight:'normal'}}>{unit}</Text></Text>
+            </View>
+        );
+        return (
+            <View style={{ marginBottom: 20 }}>
+                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>VITALS (AUTO-FILLED)</Text>
+                    <Text style={{ fontSize: 10, color: theme.textDim }}>{new Date(latestVitals.date).toLocaleDateString()}</Text>
+                 </View>
+                 <View style={{ flexDirection:'row', gap: 8, flexWrap:'wrap' }}>
+                     {latestVitals.sys && <VitalItem label="BP" value={`${latestVitals.sys}/${latestVitals.dia}`} unit="mmHg" icon={Activity} color="#ef4444" />}
+                     {latestVitals.pulse && <VitalItem label="Pulse" value={latestVitals.pulse} unit="bpm" icon={HeartPulse} color="#8b5cf6" />}
+                     {latestVitals.temp && <VitalItem label="Temp" value={latestVitals.temp} unit={`°${latestVitals.tempUnit||'C'}`} icon={Thermometer} color="#f59e0b" />}
+                     {latestVitals.weight && <VitalItem label="Weight" value={latestVitals.weight} unit="kg" icon={Weight} color="#10b981" />}
+                     {latestVitals.spo2 && <VitalItem label="SpO2" value={latestVitals.spo2} unit="%" icon={Droplet} color="#0ea5e9" />}
+                 </View>
+            </View>
+        );
+    };
+
     const renderEditor = () => (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
-            <View style={{ marginBottom: 25, backgroundColor: theme.cardBg, borderRadius: 20, padding: 5, shadowColor: theme.primary, shadowOffset: {width:0, height:4}, shadowOpacity:0.2, elevation:5 }}>
-                <LinearGradient colors={[theme.primary, theme.primaryDark]} style={{ borderRadius: 16, padding: 15 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18, letterSpacing: 1 }}>RX PRESET</Text>
-                        <FileText size={24} color="rgba(255,255,255,0.3)" />
-                    </View>
-                </LinearGradient>
-                <View style={{ padding: 15, gap: 15 }}>
-                    <InputGroup icon={FileText} label="Template Name *" value={editorForm.name} onChange={t => setEditorForm({...editorForm, name: t})} theme={theme} placeholder="e.g. Viral Fever" />
-                    <InputGroup icon={Stethoscope} label="Diagnosis / Condition" value={editorForm.diagnosis} onChange={t => setEditorForm({...editorForm, diagnosis: t})} theme={theme} placeholder="e.g. Viral Pyrexia" />
+            {isPrescription && (
+                <View style={{ marginBottom: 20 }}>
+                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                        <View>
+                             <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.text }}>{patient.name}</Text>
+                             <Text style={{ color: theme.textDim }}>{patient.age} Yrs • {patient.gender === 'M' ? 'Male' : 'Female'} • ID: #{patient.id}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                             <Text style={{ fontSize: 12, color: theme.textDim }}>Date</Text>
+                             <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text }}>{new Date().toLocaleDateString()}</Text>
+                        </View>
+                     </View>
+                     <View style={{ height: 1, backgroundColor: theme.border, marginBottom: 15 }} />
+                     {renderVitalsSummary()}
+                     
+                     <TouchableOpacity 
+                        onPress={() => setShowTemplatePicker(true)}
+                        style={{ flexDirection:'row', alignItems:'center', justifyContent:'center', gap:8, backgroundColor: theme.inputBg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.primary, marginBottom: 20 }}
+                     >
+                         <Copy size={18} color={theme.primary} />
+                         <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Load from Template</Text>
+                     </TouchableOpacity>
                 </View>
+            )}
+
+            {!isPrescription && (
+                 <View style={{ marginBottom: 25, backgroundColor: theme.cardBg, borderRadius: 20, padding: 5, shadowColor: theme.primary, shadowOffset: {width:0, height:4}, shadowOpacity:0.2, elevation:5 }}>
+                    <LinearGradient colors={[theme.primary, theme.primaryDark]} style={{ borderRadius: 16, padding: 15 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18, letterSpacing: 1 }}>RX TEMPLATE</Text>
+                            <FileText size={24} color="rgba(255,255,255,0.3)" />
+                        </View>
+                    </LinearGradient>
+                     <View style={{ padding: 15 }}>
+                        <InputGroup icon={FileText} label="Template Name *" value={editorForm.name} onChange={t => setEditorForm({...editorForm, name: t})} theme={theme} placeholder="e.g. Viral Fever" />
+                     </View>
+                 </View>
+            )}
+
+            <View style={{ marginBottom: 20 }}>
+                <InputGroup icon={Stethoscope} label="Diagnosis / Clinical Notes" value={editorForm.diagnosis} onChange={t => setEditorForm({...editorForm, diagnosis: t})} theme={theme} placeholder="e.g. Viral Pyrexia, URTI" />
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>MEDICINES</Text>
+
+            {/* --- MEDICINES SECTION --- */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, marginTop: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Pill size={16} color={theme.textDim} />
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>MEDICINES (Rx)</Text>
+                </View>
                 <TouchableOpacity onPress={openMedModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.inputBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.border }}>
                     <PlusCircle size={16} color={theme.primary} />
                     <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>Add Medicine</Text>
                 </TouchableOpacity>
             </View>
+
             <View style={{ gap: 12, marginBottom: 25 }}>
                 {editorForm.medicines.map((med, index) => (
                     <View key={index} style={{ backgroundColor: theme.cardBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 15, shadowColor: "#000", shadowOffset: {width:0,height:2}, shadowOpacity:0.05, elevation:2 }}>
-                        <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#f0f9ff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#bae6fd' }}><Pill size={22} color="#0ea5e9" /></View>
+                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#f0f9ff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#bae6fd' }}><Text style={{fontWeight:'bold', color:'#0ea5e9'}}>{index + 1}</Text></View>
                         <View style={{ flex: 1 }}>
                             <Text style={{ fontWeight: 'bold', color: theme.text, fontSize: 16 }}>{med.name} <Text style={{fontSize: 13, fontWeight: '500', color: theme.textDim}}>{med.dosage ? `(${med.dosage})` : ''}</Text></Text>
                             {med.isTapering ? (
@@ -1105,43 +1246,87 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                         <TouchableOpacity onPress={() => removeMedFromTemplate(index)} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 10 }}><Trash2 size={18} color="#ef4444" /></TouchableOpacity>
                     </View>
                 ))}
-                {editorForm.medicines.length === 0 && <View style={{ padding: 30, borderWidth: 2, borderColor: theme.border, borderStyle: 'dashed', borderRadius: 16, alignItems: 'center', backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: '600' }}>No medicines added yet.</Text><TouchableOpacity onPress={openMedModal}><Text style={{ color: theme.primary, fontWeight: 'bold', marginTop: 5 }}>+ Add First Medicine</Text></TouchableOpacity></View>}
+                {editorForm.medicines.length === 0 && <View style={{ padding: 20, borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed', borderRadius: 16, alignItems: 'center', backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: '600' }}>No medicines added yet.</Text></View>}
             </View>
+
+            {/* --- PROCEDURES SECTION --- */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Settings size={16} color={theme.textDim} />
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>PROCEDURES / SERVICES</Text>
+                </View>
+                <TouchableOpacity onPress={() => { setProcModalVisible(true); setProcViewMode('list'); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.inputBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.border }}>
+                    <PlusCircle size={16} color={theme.primary} />
+                    <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>Add Procedure</Text>
+                </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 12, marginBottom: 25 }}>
+                {(editorForm.procedures || []).map((proc, index) => (
+                     <View key={index} style={{ backgroundColor: theme.cardBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: "#000", shadowOffset: {width:0,height:2}, shadowOpacity:0.05, elevation:2 }}>
+                        <View>
+                            <Text style={{ fontWeight: 'bold', color: theme.text, fontSize: 16 }}>{proc.name}</Text>
+                            <Text style={{ fontSize: 13, color: theme.textDim }}>Category: {proc.category}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+                             <Text style={{ fontWeight: 'bold', color: theme.primary, fontSize: 16 }}>₹{proc.cost}</Text>
+                             <TouchableOpacity onPress={() => removeProcedureFromRx(index)} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 10 }}><Trash2 size={18} color="#ef4444" /></TouchableOpacity>
+                        </View>
+                    </View>
+                ))}
+                {(editorForm.procedures || []).length === 0 && <View style={{ padding: 20, borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed', borderRadius: 16, alignItems: 'center', backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: '600' }}>No procedures added.</Text></View>}
+                {(editorForm.procedures || []).length > 0 && (
+                    <View style={{ alignItems: 'flex-end', marginTop: 5 }}>
+                        <Text style={{ color: theme.textDim, fontSize: 12 }}>Total Estimated Cost: <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16 }}>₹{calculateTotalCost()}</Text></Text>
+                    </View>
+                )}
+            </View>
+
             <InputGroup icon={Clipboard} label="Advice / Notes" value={editorForm.advice} onChange={t => setEditorForm({...editorForm, advice: t})} theme={theme} multiline placeholder="Enter patient advice (e.g., Drink warm water)..." />
+            
+            {isPrescription && (
+                <View style={{ marginTop: 20, backgroundColor: theme.cardBg, padding: 15, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: theme.border }}>
+                    <View style={{flex: 1}}>
+                        <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16 }}>Save as New Template</Text>
+                        <Text style={{ color: theme.textDim, fontSize: 12 }}>Use this combination later</Text>
+                        {saveAsTemplate && (
+                             <TextInput 
+                                style={{ marginTop: 8, padding: 8, backgroundColor: theme.inputBg, borderRadius: 8, color: theme.text, borderWidth:1, borderColor: theme.border }}
+                                placeholder="Enter Template Name..."
+                                placeholderTextColor={theme.textDim}
+                                value={editorForm.name}
+                                onChangeText={(t) => setEditorForm({...editorForm, name: t})}
+                             />
+                        )}
+                    </View>
+                    <Switch value={saveAsTemplate} onValueChange={setSaveAsTemplate} trackColor={{ false: theme.inputBg, true: theme.primary }} thumbColor={'white'} />
+                </View>
+            )}
+
+            {isPrescription && (
+                <View style={{ marginTop: 40, alignItems: 'flex-end', opacity: 0.7 }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text }}>Dr. Mansoor Ali V. P.</Text>
+                    <Text style={{ fontSize: 12, color: theme.textDim }}>Cardiologist</Text>
+                </View>
+            )}
         </ScrollView>
     );
 
-    // --- HELPER COMPONENT FOR HORIZONTAL LISTS ---
     const ManageableOptionList = ({ data, selectedValue, onSelect, onAdd, onLongPress, color }) => (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 10 }}>
-            {/* Add Button */}
             <TouchableOpacity 
                 onPress={onAdd}
-                style={{ 
-                    width: 40, height: 40, borderRadius: 12, 
-                    alignItems: 'center', justifyContent: 'center', 
-                    backgroundColor: theme.inputBg, 
-                    borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed' 
-                }}
+                style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.inputBg, borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed' }}
             >
                 <Plus size={18} color={theme.textDim} />
             </TouchableOpacity>
-
             {data.map((item, index) => {
                 const isSelected = selectedValue === item;
                 const activeColor = color || theme.primary;
                 return (
                     <TouchableOpacity 
-                        key={index} 
-                        onPress={() => onSelect(item)} 
-                        onLongPress={() => onLongPress(item)}
-                        delayLongPress={500}
-                        style={{ 
-                            backgroundColor: isSelected ? activeColor : theme.cardBg, 
-                            paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, 
-                            borderWidth: 1, borderColor: isSelected ? activeColor : theme.border, 
-                            shadowColor: isSelected ? activeColor : "#000", shadowOpacity: isSelected ? 0.3 : 0, elevation: 3 
-                        }}
+                        key={index} onPress={() => onSelect(item)} onLongPress={() => onLongPress(item)} delayLongPress={500}
+                        style={{ backgroundColor: isSelected ? activeColor : theme.cardBg, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: isSelected ? activeColor : theme.border, shadowColor: isSelected ? activeColor : "#000", shadowOpacity: isSelected ? 0.3 : 0, elevation: 3 }}
                     >
                         <Text style={{ color: isSelected ? 'white' : theme.text, fontWeight: 'bold' }}>{item}</Text>
                     </TouchableOpacity>
@@ -1150,7 +1335,6 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         </ScrollView>
     );
 
-    // --- REPLACED MODAL LOGIC FOR AUTO-FILL ---
     const renderMedModal = () => {
         const inventoryMatches = medicines.filter(m => m.name.toLowerCase().includes(medSearch.toLowerCase()) && medSearch.length > 0);
         const isLocked = newMedForm.inventoryId !== null;
@@ -1166,7 +1350,6 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                                 <TouchableOpacity onPress={() => setMedModalVisible(false)} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}><X size={20} color={theme.textDim} /></TouchableOpacity>
                             </View>
 
-                            {/* Search Section */}
                             {!isLocked && (
                                 <View style={{ marginBottom: 20 }}>
                                     <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600', fontSize: 12, letterSpacing: 1 }}>SEARCH INVENTORY</Text>
@@ -1190,19 +1373,19 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                                     )}
                                 </View>
                             )}
-
-                            {isLocked && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.inputBg, padding: 15, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: theme.primary }}>
-                                    <View>
-                                        <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>SELECTED MEDICINE</Text>
-                                        <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 18 }}>{newMedForm.name}</Text>
-                                    </View>
-                                    <TouchableOpacity onPress={clearSelection} style={{ backgroundColor: theme.cardBg, padding: 8, borderRadius: 10 }}><X size={18} color="#ef4444" /></TouchableOpacity>
-                                </View>
-                            )}
-
+                            
                             <ScrollView showsVerticalScrollIndicator={false}>
                                 <View style={{ gap: 20 }}>
+                                    {isLocked && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.inputBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: theme.primary }}>
+                                            <View>
+                                                <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>SELECTED MEDICINE</Text>
+                                                <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 18 }}>{newMedForm.name}</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={clearSelection} style={{ backgroundColor: theme.cardBg, padding: 8, borderRadius: 10 }}><X size={18} color="#ef4444" /></TouchableOpacity>
+                                        </View>
+                                    )}
+                                    
                                     <View style={{ flexDirection: 'row', gap: 15 }}>
                                         <View style={{ flex: 1 }}>
                                             <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Content/Strength</Text>
@@ -1226,70 +1409,35 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                                         <Switch value={newMedForm.isTapering} onValueChange={v => setNewMedForm({...newMedForm, isTapering: v})} trackColor={{ false: theme.inputBg, true: theme.primary }} thumbColor={'white'} />
                                     </View>
 
-                                    {/* CONDITIONAL RENDER: STANDARD OR TAPERING */}
                                     {newMedForm.isTapering ? (
                                         <View style={{ gap: 20, backgroundColor: 'rgba(234, 88, 12, 0.05)', padding: 15, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(234, 88, 12, 0.2)' }}>
                                             <Text style={{ color: '#ea580c', fontWeight: 'bold', fontSize: 14, textTransform: 'uppercase', marginBottom: 5 }}>TAPERING SCHEDULE</Text>
-                                            <Text style={{ color: theme.textDim, fontSize: 12, fontStyle: 'italic', marginBottom: 10 }}>Select options from below lists (Long press to edit/delete)</Text>
-                                            
                                             <View>
                                                 <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Frequency Pattern</Text>
-                                                <ManageableOptionList 
-                                                    data={freqOptions} selectedValue={newMedForm.freq} 
-                                                    onSelect={(val) => setNewMedForm({...newMedForm, freq: val})} 
-                                                    onAdd={() => openAddInput('freq')} onLongPress={(val) => handleLongPressItem('freq', val)}
-                                                    color="#ea580c"
-                                                />
+                                                <ManageableOptionList data={freqOptions} selectedValue={newMedForm.freq} onSelect={(val) => setNewMedForm({...newMedForm, freq: val})} onAdd={() => openAddInput('freq')} onLongPress={(val) => handleLongPressItem('freq', val)} color="#ea580c" />
                                             </View>
                                             <View>
                                                 <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>For Duration</Text>
-                                                <ManageableOptionList 
-                                                    data={durOptions} selectedValue={newMedForm.duration} 
-                                                    onSelect={(val) => setNewMedForm({...newMedForm, duration: val})} 
-                                                    onAdd={() => openAddInput('dur')} onLongPress={(val) => handleLongPressItem('dur', val)}
-                                                    color="#f97316"
-                                                />
+                                                <ManageableOptionList data={durOptions} selectedValue={newMedForm.duration} onSelect={(val) => setNewMedForm({...newMedForm, duration: val})} onAdd={() => openAddInput('dur')} onLongPress={(val) => handleLongPressItem('dur', val)} color="#f97316" />
                                             </View>
                                         </View>
                                     ) : (
                                         <>
                                             <View>
                                                 <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Dose Amount</Text>
-                                                <ManageableOptionList 
-                                                    data={doseOptions} selectedValue={newMedForm.doseQty} 
-                                                    onSelect={(val) => setNewMedForm({...newMedForm, doseQty: val})} 
-                                                    onAdd={() => openAddInput('dose')} onLongPress={(val) => handleLongPressItem('dose', val)}
-                                                    color="#06b6d4"
-                                                />
+                                                <ManageableOptionList data={doseOptions} selectedValue={newMedForm.doseQty} onSelect={(val) => setNewMedForm({...newMedForm, doseQty: val})} onAdd={() => openAddInput('dose')} onLongPress={(val) => handleLongPressItem('dose', val)} color="#06b6d4" />
                                             </View>
-
                                             <View>
                                                 <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Frequency</Text>
-                                                <ManageableOptionList 
-                                                    data={freqOptions} selectedValue={newMedForm.freq} 
-                                                    onSelect={(val) => setNewMedForm({...newMedForm, freq: val})} 
-                                                    onAdd={() => openAddInput('freq')} onLongPress={(val) => handleLongPressItem('freq', val)}
-                                                />
+                                                <ManageableOptionList data={freqOptions} selectedValue={newMedForm.freq} onSelect={(val) => setNewMedForm({...newMedForm, freq: val})} onAdd={() => openAddInput('freq')} onLongPress={(val) => handleLongPressItem('freq', val)} />
                                             </View>
-
                                             <View>
                                                 <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Duration</Text>
-                                                <ManageableOptionList 
-                                                    data={durOptions} selectedValue={newMedForm.duration} 
-                                                    onSelect={(val) => setNewMedForm({...newMedForm, duration: val})} 
-                                                    onAdd={() => openAddInput('dur')} onLongPress={(val) => handleLongPressItem('dur', val)}
-                                                    color="#8b5cf6"
-                                                />
+                                                <ManageableOptionList data={durOptions} selectedValue={newMedForm.duration} onSelect={(val) => setNewMedForm({...newMedForm, duration: val})} onAdd={() => openAddInput('dur')} onLongPress={(val) => handleLongPressItem('dur', val)} color="#8b5cf6" />
                                             </View>
-
                                             <View>
                                                 <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Instructions</Text>
-                                                <ManageableOptionList 
-                                                    data={instrOptions} selectedValue={newMedForm.instruction} 
-                                                    onSelect={(val) => setNewMedForm({...newMedForm, instruction: val})} 
-                                                    onAdd={() => openAddInput('instr')} onLongPress={(val) => handleLongPressItem('instr', val)}
-                                                    color="#f59e0b"
-                                                />
+                                                <ManageableOptionList data={instrOptions} selectedValue={newMedForm.instruction} onSelect={(val) => setNewMedForm({...newMedForm, instruction: val})} onAdd={() => openAddInput('instr')} onLongPress={(val) => handleLongPressItem('instr', val)} color="#f59e0b" />
                                             </View>
                                         </>
                                     )}
@@ -1302,32 +1450,178 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                                 </LinearGradient>
                             </TouchableOpacity>
                          </View>
-                         {/* CUSTOM INPUT MODAL OVERLAY */}
-                         <Modal visible={inputVisible} transparent animationType="fade">
-                            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                                <View style={{ width: '100%', maxWidth: 300, backgroundColor: theme.cardBg, borderRadius: 20, padding: 20 }}>
-                                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 15 }}>{editingItem ? 'Edit Item' : 'Add New Item'}</Text>
-                                    <View style={[styles.inputContainer, { backgroundColor: theme.inputBg, borderColor: theme.primary }]}>
-                                        <TextInput 
-                                            style={{ flex: 1, color: theme.text, fontSize: 16 }} 
-                                            value={inputText} onChangeText={setInputText} autoFocus 
-                                            placeholder="Type custom value..." placeholderTextColor={theme.textDim}
-                                        />
-                                    </View>
-                                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-                                        <TouchableOpacity onPress={() => setInputVisible(false)} style={{ flex: 1, padding: 12, alignItems: 'center', borderRadius: 10, backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: 'bold' }}>Cancel</Text></TouchableOpacity>
-                                        <TouchableOpacity onPress={handleAddItem} style={{ flex: 1, padding: 12, alignItems: 'center', borderRadius: 10, backgroundColor: theme.primary }}><Text style={{ color: 'white', fontWeight: 'bold' }}>{editingItem ? 'Update' : 'Add'}</Text></TouchableOpacity>
-                                    </View>
-                                </View>
-                            </View>
-                         </Modal>
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
         );
     };
 
-    // --- TEMPLATE DETAIL POPUP ---
+    // --- REFACTORED PROCEDURE PICKER MODAL ---
+    const renderProcedureModal = () => {
+        // Filter Logic
+        const procMatches = (procedures || []).filter(p => p.name.toLowerCase().includes(procSearch.toLowerCase()) && procSearch.length > 0);
+        
+        // Helper to get category details
+        const getCatInfo = (catName) => PROCEDURE_CATEGORIES.find(c => c.value === catName) || PROCEDURE_CATEGORIES[0];
+
+        // Content to render based on view mode
+        const renderModalContent = () => {
+            if (procViewMode === 'list') {
+                return (
+                    <View style={{flex: 1}}>
+                         {/* Header */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
+                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>Add Procedure</Text>
+                            <TouchableOpacity onPress={() => setProcModalVisible(false)} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}><X size={20} color={theme.textDim} /></TouchableOpacity>
+                        </View>
+
+                         {/* Add New Master Button (Top Right Action) */}
+                        <View style={{position: 'absolute', top: 0, right: 50}}>
+                             <TouchableOpacity onPress={openAddMasterProc} style={{flexDirection:'row', alignItems:'center', gap:5, backgroundColor: theme.inputBg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20}}>
+                                 <PlusCircle size={16} color={theme.primary} />
+                                 <Text style={{color: theme.primary, fontSize: 12, fontWeight: 'bold'}}>New</Text>
+                             </TouchableOpacity>
+                        </View>
+
+                        {/* Search Bar */}
+                        <View style={{ marginBottom: 15 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: theme.border }}>
+                                <Search size={20} color={theme.textDim} style={{ marginRight: 10 }} />
+                                <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} placeholder="Search procedure name..." placeholderTextColor={theme.textDim} value={procSearch} onChangeText={setProcSearch} />
+                                {procSearch.length > 0 && <TouchableOpacity onPress={() => setProcSearch('')}><X size={18} color={theme.textDim} /></TouchableOpacity>}
+                            </View>
+                        </View>
+
+                         {/* Custom Investigation Toggle */}
+                         <TouchableOpacity onPress={() => setShowCustomInput(!showCustomInput)} style={{flexDirection: 'row', alignItems: 'center', justifyContent:'space-between', backgroundColor: showCustomInput ? theme.inputBg : theme.cardBg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border, marginBottom: 15}}>
+                             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+                                 <View style={{width: 32, height: 32, borderRadius: 8, backgroundColor: '#f5f3ff', alignItems: 'center', justifyContent: 'center'}}>
+                                     <FlaskConical size={18} color="#8b5cf6" />
+                                 </View>
+                                 <Text style={{fontWeight: 'bold', color: theme.text}}>Add Custom Investigation</Text>
+                             </View>
+                             <ChevronDown size={20} color={theme.textDim} style={{transform: [{rotate: showCustomInput ? '180deg' : '0deg'}]}} />
+                         </TouchableOpacity>
+
+                         {/* Custom Input Fields (Visible only if toggled) */}
+                         {showCustomInput && (
+                             <View style={{backgroundColor: theme.inputBg, padding: 15, borderRadius: 16, marginBottom: 15, gap: 10}}>
+                                 <InputGroup icon={FileText} label="Procedure Name" value={customProcForm.name} onChange={t => setCustomProcForm({...customProcForm, name: t})} theme={theme} placeholder="e.g. X-Ray Chest" />
+                                 <View style={{flexDirection:'row', gap: 10, alignItems: 'flex-end'}}>
+                                     <View style={{flex: 1}}>
+                                         <InputGroup icon={Banknote} label="Price" value={customProcForm.cost} onChange={t => setCustomProcForm({...customProcForm, cost: t})} theme={theme} placeholder="0" keyboardType="numeric" />
+                                     </View>
+                                     <TouchableOpacity onPress={addCustomToRx} style={{backgroundColor: theme.primary, height: 55, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 4}}>
+                                         <Text style={{color: 'white', fontWeight: 'bold'}}>Add</Text>
+                                     </TouchableOpacity>
+                                 </View>
+                             </View>
+                         )}
+
+                         {/* Procedures List */}
+                         <FlatList 
+                            data={procSearch.length > 0 ? procMatches : procedures}
+                            keyExtractor={item => item.id.toString()}
+                            contentContainerStyle={{paddingBottom: 20}}
+                            showsVerticalScrollIndicator={false}
+                            renderItem={({item}) => {
+                                const catInfo = getCatInfo(item.category);
+                                return (
+                                    <View style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: theme.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1}}>
+                                            <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: catInfo.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                                <catInfo.icon size={20} color={catInfo.color} />
+                                            </View>
+                                            <View style={{flex: 1}}>
+                                                <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 15 }}>{item.name}</Text>
+                                                <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                                                    <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 13 }}>₹{item.cost}</Text>
+                                                    <Text style={{ color: theme.textDim, fontSize: 12 }}>• {item.category}</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                        
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                            <TouchableOpacity onPress={() => addProcedureToForm(item)} style={{ padding: 8, backgroundColor: theme.inputBg, borderRadius: 8 }}>
+                                                <PlusCircle size={20} color={theme.primary} />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => openEditMasterProc(item)} style={{ padding: 8, backgroundColor: theme.inputBg, borderRadius: 8 }}>
+                                                <Pencil size={18} color={theme.textDim} />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => handleDeleteMasterProcedure(item.id)} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 8 }}>
+                                                <Trash2 size={18} color="#ef4444" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                );
+                            }}
+                         />
+                    </View>
+                );
+            } else {
+                // ADD / EDIT MASTER MODE
+                return (
+                    <View style={{flex: 1}}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
+                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{procViewMode === 'edit_master' ? 'Edit Procedure' : 'Add New Procedure'}</Text>
+                            <TouchableOpacity onPress={() => setProcViewMode('list')} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}><ArrowLeft size={20} color={theme.textDim} /></TouchableOpacity>
+                        </View>
+                        
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <View style={{ gap: 15 }}>
+                                <InputGroup icon={Settings} label="Procedure Name *" value={masterProcForm.name} onChange={t => setMasterProcForm({...masterProcForm, name: t})} theme={theme} placeholder="Enter procedure name" />
+                                <InputGroup icon={Banknote} label="Price (₹) *" value={masterProcForm.cost} onChange={t => setMasterProcForm({...masterProcForm, cost: t})} theme={theme} placeholder="Enter price" keyboardType="numeric" />
+                                {/* Simple Category Selector for speed - could use CustomPicker if needed */}
+                                <View>
+                                    <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Category</Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 10}}>
+                                        {PROCEDURE_CATEGORIES.map((cat) => (
+                                            <TouchableOpacity 
+                                                key={cat.value} 
+                                                onPress={() => setMasterProcForm({...masterProcForm, category: cat.value})}
+                                                style={{
+                                                    flexDirection: 'row', alignItems: 'center', gap: 6,
+                                                    paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20,
+                                                    backgroundColor: masterProcForm.category === cat.value ? cat.color : theme.inputBg,
+                                                    borderWidth: 1, borderColor: masterProcForm.category === cat.value ? cat.color : theme.border
+                                                }}
+                                            >
+                                                <cat.icon size={14} color={masterProcForm.category === cat.value ? 'white' : cat.color} />
+                                                <Text style={{color: masterProcForm.category === cat.value ? 'white' : theme.text, fontWeight: '600', fontSize: 12}}>{cat.label}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            </View>
+                        </ScrollView>
+
+                        <View style={{flexDirection: 'row', gap: 10, marginTop: 20}}>
+                            <TouchableOpacity onPress={() => setProcViewMode('list')} style={{ flex: 1, padding: 15, borderRadius: 12, alignItems: 'center', backgroundColor: theme.inputBg }}>
+                                <Text style={{ color: theme.textDim, fontWeight: 'bold' }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleSaveMasterProcedure} style={{ flex: 1, padding: 15, borderRadius: 12, alignItems: 'center', backgroundColor: theme.primary }}>
+                                <Text style={{ color: 'white', fontWeight: 'bold' }}>Save</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                );
+            }
+        };
+
+        return (
+            <Modal visible={procModalVisible} animationType="slide" transparent onRequestClose={() => setProcModalVisible(false)}>
+                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+                         <TouchableOpacity style={{ flex: 1 }} onPress={() => setProcModalVisible(false)} />
+                         <View style={{ backgroundColor: theme.cardBg, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, height: '85%', shadowColor: "#000", shadowOffset: {width:0, height:-10}, shadowOpacity:0.3, elevation:20 }}>
+                             {renderModalContent()}
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+        );
+    };
+
     const TemplateDetailPopup = () => {
         if (!selectedTemplate || !viewModalVisible) return null;
         return (
@@ -1350,7 +1644,6 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                                 <Stethoscope size={16} color={theme.textDim} />
                                 <Text style={{ fontSize: 14, color: theme.textDim, fontWeight: '600' }}>Diagnosis: {selectedTemplate.diagnosis}</Text>
                             </View>
-                            
                             <Text style={{ fontSize: 14, color: theme.textDim, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 10 }}>Medicines List</Text>
                             <View style={{ gap: 10, marginBottom: 20 }}>
                                 {selectedTemplate.medicines.map((med, idx) => (
@@ -1367,7 +1660,6 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                                     </View>
                                 ))}
                             </View>
-
                             <View style={{ backgroundColor: '#fff7ed', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#ffedd5' }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                                     <Clipboard size={16} color="#c2410c" />
@@ -1382,25 +1674,60 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         );
     };
 
+    const TemplatePickerModal = () => (
+        <Modal visible={showTemplatePicker} transparent animationType="slide" onRequestClose={() => setShowTemplatePicker(false)}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                <View style={{ backgroundColor: theme.cardBg, borderTopLeftRadius: 25, borderTopRightRadius: 25, maxHeight: height * 0.7, paddingBottom: 30 }}>
+                    <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: theme.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>Select a Template</Text>
+                        <TouchableOpacity onPress={() => setShowTemplatePicker(false)}><X size={24} color={theme.textDim} /></TouchableOpacity>
+                    </View>
+                    <FlatList 
+                        data={templates}
+                        keyExtractor={(item) => item.id.toString()}
+                        contentContainerStyle={{ padding: 20 }}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity onPress={() => applyTemplate(item)} style={{ paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+                                    <View style={{ backgroundColor: theme.inputBg, width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
+                                        <FileText size={20} color={theme.primary} />
+                                    </View>
+                                    <View>
+                                        <Text style={{ fontSize: 16, color: theme.text, fontWeight: 'bold' }}>{item.name}</Text>
+                                        <Text style={{ fontSize: 12, color: theme.textDim }}>{item.medicines.length} Medicines • {item.diagnosis}</Text>
+                                    </View>
+                                </View>
+                                <ChevronRight size={16} color={theme.textDim} />
+                            </TouchableOpacity>
+                        )}
+                        ListEmptyComponent={<Text style={{textAlign: 'center', padding: 20, color: theme.textDim}}>No templates available.</Text>}
+                    />
+                </View>
+            </View>
+        </Modal>
+    );
+
     return (
         <View style={[styles.container, { backgroundColor: theme.bg }]}>
             <View style={[styles.header, { marginTop: insets.top + 10 }]}>
-                {view === 'list' ? (
+                {view === 'list' && !isPrescription ? (
                      <TouchableOpacity onPress={onBack} style={[styles.iconBtn, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
                         <ArrowLeft size={24} color={theme.text} />
                     </TouchableOpacity>
                 ) : (
-                    <TouchableOpacity onPress={() => setView('list')} style={[styles.iconBtn, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
-                        <X size={24} color={theme.text} />
+                    <TouchableOpacity onPress={() => isPrescription ? onBack() : setView('list')} style={[styles.iconBtn, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+                        <ArrowLeft size={24} color={theme.text} />
                     </TouchableOpacity>
                 )}
                 
                 <View style={{flex: 1, paddingHorizontal: 15}}>
-                    <Text style={[styles.headerTitle, { color: theme.text }]}>{view === 'list' ? 'Templates' : editorForm.id ? 'Edit Template' : 'New Template'}</Text>
-                    {view === 'list' && <Text style={{ fontSize: 12, color: theme.textDim }}>Manage your prescription sets</Text>}
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>
+                        {isPrescription ? 'New Prescription' : view === 'list' ? 'Templates' : editorForm.id ? 'Edit Template' : 'New Template'}
+                    </Text>
+                    {isPrescription ? <Text style={{ fontSize: 12, color: theme.textDim }}>Write Rx for {patient?.name}</Text> : view === 'list' && <Text style={{ fontSize: 12, color: theme.textDim }}>Manage your prescription sets</Text>}
                 </View>
 
-                {view === 'list' ? (
+                {view === 'list' && !isPrescription ? (
                     <TouchableOpacity onPress={handleCreate} style={[styles.iconBtn, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
                         <Plus size={24} color="white" />
                     </TouchableOpacity>
@@ -1412,71 +1739,77 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
             </View>
 
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-                {view === 'list' ? renderList() : renderEditor()}
+                {view === 'list' && !isPrescription ? renderList() : renderEditor()}
             </KeyboardAvoidingView>
             {renderMedModal()}
+            {renderProcedureModal()} 
             {TemplateDetailPopup()}
+            {TemplatePickerModal()}
+            
+            {/* Simple Input Modal for Items */}
+            <Modal visible={inputVisible} transparent animationType="fade">
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                    <View style={{ width: '100%', maxWidth: 300, backgroundColor: theme.cardBg, borderRadius: 20, padding: 20 }}>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 15 }}>{editingItem ? 'Edit Item' : 'Add New Item'}</Text>
+                        <View style={[styles.inputContainer, { backgroundColor: theme.inputBg, borderColor: theme.primary }]}>
+                            <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} value={inputText} onChangeText={setInputText} autoFocus placeholder="Type custom value..." placeholderTextColor={theme.textDim} />
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+                            <TouchableOpacity onPress={() => setInputVisible(false)} style={{ flex: 1, padding: 12, alignItems: 'center', borderRadius: 10, backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: 'bold' }}>Cancel</Text></TouchableOpacity>
+                            <TouchableOpacity onPress={handleAddItem} style={{ flex: 1, padding: 12, alignItems: 'center', borderRadius: 10, backgroundColor: theme.primary }}><Text style={{ color: 'white', fontWeight: 'bold' }}>{editingItem ? 'Update' : 'Add'}</Text></TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
 // --- END TEMPLATE SCREEN ---
 
-// --- VITALS SCREEN ---
+// --- VITALS SCREEN (REFACTORED - CLEAN & EDITABLE ONLY) ---
 const VitalsScreen = ({ theme, onBack, patient, onSaveVitals, showToast }) => {
     const insets = useSafeAreaInsets();
-    const [history, setHistory] = useState(patient?.vitalsHistory || []);
-    const [editingId, setEditingId] = useState(null);
-
+    
+    // Initial state based on the LATEST history record if available
     const [form, setForm] = useState({
         sys: '', dia: '', pulse: '', spo2: '', weight: '', temp: '', tempUnit: 'C'
     });
 
+    // On Load: Populate with latest vitals
+    useEffect(() => {
+        if (patient?.vitalsHistory && patient.vitalsHistory.length > 0) {
+            const latest = patient.vitalsHistory[0]; // Assuming index 0 is latest
+            setForm({
+                sys: latest.sys || '',
+                dia: latest.dia || '',
+                pulse: latest.pulse || '',
+                spo2: latest.spo2 || '',
+                weight: latest.weight || '',
+                temp: latest.temp || '',
+                tempUnit: latest.tempUnit || 'C'
+            });
+        }
+    }, [patient]);
+
     const handleSave = () => {
         if (!form.sys && !form.weight && !form.temp) {
-            Alert.alert("Empty Input", "Please enter at least one vital sign (BP, Weight, or Temp).");
+            Alert.alert("Empty Input", "Please enter at least one vital sign.");
             return;
         }
 
+        // Logic: Create a new record timestamped NOW, but effectively "updating" current status
         const newEntry = {
-            id: editingId || Date.now(),
+            id: Date.now(),
             date: new Date().toISOString(),
             ...form
         };
 
-        let updatedHistory;
-        if (editingId) {
-            updatedHistory = history.map(h => h.id === editingId ? newEntry : h);
-            setEditingId(null);
-            showToast('Success', 'Vitals Record Updated', 'success');
-        } else {
-            updatedHistory = [newEntry, ...history];
-            showToast('Saved', 'Vitals Recorded Successfully', 'success');
-        }
-
-        setHistory(updatedHistory);
-        setForm({ sys: '', dia: '', pulse: '', spo2: '', weight: '', temp: '', tempUnit: 'C' });
+        // Add to TOP of history (Latest)
+        const updatedHistory = [newEntry, ...(patient.vitalsHistory || [])];
+        
         onSaveVitals(patient.id, updatedHistory);
-        Keyboard.dismiss();
-    };
-
-    const handleEdit = (item) => {
-        setForm({
-            sys: item.sys, dia: item.dia, pulse: item.pulse, spo2: item.spo2, 
-            weight: item.weight, temp: item.temp, tempUnit: item.tempUnit || 'C'
-        });
-        setEditingId(item.id);
-    };
-
-    const handleDelete = (id) => {
-        Alert.alert("Delete Record", "Remove this vital sign record?", [
-            { text: "Cancel", style: "cancel" },
-            { text: "Delete", style: 'destructive', onPress: () => {
-                const updated = history.filter(h => h.id !== id);
-                setHistory(updated);
-                onSaveVitals(patient.id, updated);
-                showToast('Deleted', 'Vitals record removed', 'error');
-            }}
-        ]);
+        showToast('Success', 'Current Vitals Updated', 'success');
+        // Keyboard.dismiss(); // Optional: Dismiss if you want, or keep open for multiple edits
     };
 
     const MedicalInput = ({ icon: Icon, label, value, onChange, unit, placeholder, color, width = '48%' }) => (
@@ -1484,12 +1817,12 @@ const VitalsScreen = ({ theme, onBack, patient, onSaveVitals, showToast }) => {
             <Text style={{ fontSize: 11, color: theme.textDim, marginBottom: 6, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</Text>
             <View style={{ 
                 flexDirection: 'row', alignItems: 'center', backgroundColor: theme.cardBg, 
-                borderRadius: 12, height: 52, 
+                borderRadius: 12, height: 55, 
                 borderWidth: 1.5, borderColor: value ? color : theme.border, 
                 paddingHorizontal: 12, 
                 shadowColor: value ? color : "#000", shadowOffset: {width:0,height:2}, shadowOpacity: value ? 0.15 : 0.05, shadowRadius: 3, elevation: value ? 3 : 1 
             }}>
-                <Icon size={18} color={value ? color : theme.textDim} strokeWidth={2.5} />
+                <Icon size={20} color={value ? color : theme.textDim} strokeWidth={2.5} />
                 <TextInput 
                     style={{ flex: 1, marginLeft: 10, color: theme.text, fontWeight: '700', fontSize: 18 }}
                     value={value}
@@ -1510,148 +1843,74 @@ const VitalsScreen = ({ theme, onBack, patient, onSaveVitals, showToast }) => {
                     <ArrowLeft size={24} color={theme.text} />
                 </TouchableOpacity>
                 <View style={{flex:1, paddingHorizontal: 15}}>
-                    <Text style={[styles.headerTitle, { color: theme.text }]}>Clinical Vitals</Text>
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>Patient Vitals</Text>
                     <Text style={{ fontSize: 12, color: theme.textDim, fontWeight: '500' }}>Patient: {patient?.name}</Text>
                 </View>
                 <TouchableOpacity onPress={handleSave} style={{ backgroundColor: theme.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, shadowColor: theme.primary, shadowOpacity: 0.3, shadowRadius: 5 }}>
-                    <Text style={{color: 'white', fontWeight: 'bold'}}>{editingId ? 'Update' : 'Save Record'}</Text>
+                    <Text style={{color: 'white', fontWeight: 'bold'}}>Save Update</Text>
                 </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-                <View style={{ marginBottom: 30 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Clipboard size={18} color={theme.primary} />
-                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text }}>New Reading</Text>
-                        </View>
-                        <View style={{ backgroundColor: theme.inputBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
-                            <Text style={{ fontSize: 12, color: theme.textDim, fontWeight: '600' }}>
-                                {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </Text>
-                        </View>
-                    </View>
+                {/* NOTICE BOX */}
+                <View style={{ backgroundColor: '#fff7ed', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#ffedd5', marginBottom: 25, flexDirection: 'row', gap: 10 }}>
+                    <AlertCircle size={20} color="#c2410c" />
+                    <Text style={{ color: '#9a3412', fontSize: 13, flex: 1, lineHeight: 20 }}>
+                        <Text style={{fontWeight: 'bold'}}>Note:</Text> Updating vitals here will update the patient's current record.
+                    </Text>
+                </View>
 
-                    <View style={{ backgroundColor: theme.inputBg, borderRadius: 24, padding: 20, borderWidth: 1, borderColor: theme.border }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <MedicalInput icon={Activity} label="Systolic (High)" value={form.sys} onChange={t => setForm({...form, sys: t})} unit="mmHg" placeholder="120" color="#ef4444" />
-                            <MedicalInput icon={Activity} label="Diastolic (Low)" value={form.dia} onChange={t => setForm({...form, dia: t})} unit="mmHg" placeholder="80" color="#ef4444" />
-                        </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <MedicalInput icon={HeartPulse} label="Pulse Rate" value={form.pulse} onChange={t => setForm({...form, pulse: t})} unit="BPM" placeholder="72" color="#8b5cf6" />
-                            <MedicalInput icon={Droplet} label="SpO2 Level" value={form.spo2} onChange={t => setForm({...form, spo2: t})} unit="%" placeholder="98" color="#0ea5e9" />
-                        </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <MedicalInput icon={Weight} label="Weight" value={form.weight} onChange={t => setForm({...form, weight: t})} unit="kg" placeholder="65" color="#10b981" />
-                            <View style={{ width: '48%', marginBottom: 15 }}>
-                                <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6}}>
-                                    <Text style={{ fontSize: 11, color: theme.textDim, fontWeight: '700', textTransform: 'uppercase' }}>Temp</Text>
-                                    <TouchableOpacity onPress={() => setForm({...form, tempUnit: form.tempUnit === 'C' ? 'F' : 'C'})}>
-                                        <Text style={{ fontSize: 10, color: theme.primary, fontWeight: 'bold' }}>Scale: °{form.tempUnit}</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <View style={{ 
-                                    flexDirection: 'row', alignItems: 'center', backgroundColor: theme.cardBg, 
-                                    borderRadius: 12, height: 52, 
-                                    borderWidth: 1.5, borderColor: form.temp ? '#f59e0b' : theme.border, 
-                                    paddingHorizontal: 12, 
-                                    shadowColor: form.temp ? "#f59e0b" : "#000", shadowOpacity: form.temp ? 0.15 : 0.05, elevation: 2 
-                                }}>
-                                    <Thermometer size={18} color={form.temp ? '#f59e0b' : theme.textDim} strokeWidth={2.5} />
-                                    <TextInput style={{ flex: 1, marginLeft: 10, color: theme.text, fontWeight: '700', fontSize: 18 }} value={form.temp} onChangeText={t => setForm({...form, temp: t})} placeholder="36.6" placeholderTextColor={theme.textDim} keyboardType="numeric" />
-                                    <Text style={{ color: theme.textDim, fontSize: 11, fontWeight: 'bold' }}>°{form.tempUnit}</Text>
-                                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Activity size={20} color={theme.primary} />
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>Current Readings</Text>
+                    </View>
+                    <View style={{ backgroundColor: theme.inputBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 12, color: theme.textDim, fontWeight: '600' }}>
+                            {new Date().toLocaleDateString()}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* INPUT GRID - CLEAN LAYOUT */}
+                <View style={{ backgroundColor: theme.inputBg, borderRadius: 24, padding: 20, borderWidth: 1, borderColor: theme.border }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <MedicalInput icon={Activity} label="Systolic (High)" value={form.sys} onChange={t => setForm({...form, sys: t})} unit="mmHg" placeholder="120" color="#ef4444" />
+                        <MedicalInput icon={Activity} label="Diastolic (Low)" value={form.dia} onChange={t => setForm({...form, dia: t})} unit="mmHg" placeholder="80" color="#ef4444" />
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <MedicalInput icon={HeartPulse} label="Pulse Rate" value={form.pulse} onChange={t => setForm({...form, pulse: t})} unit="BPM" placeholder="72" color="#8b5cf6" />
+                        <MedicalInput icon={Droplet} label="SpO2 Level" value={form.spo2} onChange={t => setForm({...form, spo2: t})} unit="%" placeholder="98" color="#0ea5e9" />
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <MedicalInput icon={Weight} label="Weight" value={form.weight} onChange={t => setForm({...form, weight: t})} unit="kg" placeholder="65" color="#10b981" />
+                        <View style={{ width: '48%', marginBottom: 15 }}>
+                            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6}}>
+                                <Text style={{ fontSize: 11, color: theme.textDim, fontWeight: '700', textTransform: 'uppercase' }}>Temp</Text>
+                                <TouchableOpacity onPress={() => setForm({...form, tempUnit: form.tempUnit === 'C' ? 'F' : 'C'})}>
+                                    <Text style={{ fontSize: 10, color: theme.primary, fontWeight: 'bold' }}>Scale: °{form.tempUnit}</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={{ 
+                                flexDirection: 'row', alignItems: 'center', backgroundColor: theme.cardBg, 
+                                borderRadius: 12, height: 55, 
+                                borderWidth: 1.5, borderColor: form.temp ? '#f59e0b' : theme.border, 
+                                paddingHorizontal: 12, 
+                                shadowColor: form.temp ? "#f59e0b" : "#000", shadowOpacity: form.temp ? 0.15 : 0.05, elevation: 2 
+                            }}>
+                                <Thermometer size={20} color={form.temp ? '#f59e0b' : theme.textDim} strokeWidth={2.5} />
+                                <TextInput style={{ flex: 1, marginLeft: 10, color: theme.text, fontWeight: '700', fontSize: 18 }} value={form.temp} onChangeText={t => setForm({...form, temp: t})} placeholder="36.6" placeholderTextColor={theme.textDim} keyboardType="numeric" />
+                                <Text style={{ color: theme.textDim, fontSize: 11, fontWeight: 'bold' }}>°{form.tempUnit}</Text>
                             </View>
                         </View>
                     </View>
                 </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-                     <History size={20} color={theme.textDim} />
-                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>Past Records</Text>
-                     <View style={{ height: 1, flex: 1, backgroundColor: theme.border }} />
+                
+                {/* DECORATIVE FILLER FOR EMPTY SPACE SINCE HISTORY IS GONE */}
+                <View style={{ marginTop: 40, alignItems: 'center', opacity: 0.3 }}>
+                    <Activity size={80} color={theme.textDim} />
+                    <Text style={{ marginTop: 15, color: theme.textDim, fontSize: 14 }}>Enter latest clinical data above</Text>
                 </View>
-
-                <View style={{ paddingLeft: 10 }}>
-                    {history.map((item, index) => {
-                        const date = new Date(item.date);
-                        const isLatest = index === 0;
-                        return (
-                            <View key={item.id} style={{ flexDirection: 'row', marginBottom: 25 }}>
-                                <View style={{ alignItems: 'center', marginRight: 15 }}>
-                                    <View style={{ 
-                                        width: 14, height: 14, borderRadius: 7, 
-                                        backgroundColor: isLatest ? theme.primary : theme.border,
-                                        borderWidth: 2, borderColor: theme.bg 
-                                    }} />
-                                    {index !== history.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: theme.border, marginVertical: 4 }} />}
-                                </View>
-
-                                <View style={{ flex: 1 }}>
-                                    <Text style={{ fontSize: 12, color: theme.textDim, fontWeight: '600', marginBottom: 8 }}>
-                                        {date.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'})} • {date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                    </Text>
-                                    
-                                    <View style={{ 
-                                        backgroundColor: theme.cardBg, borderRadius: 16, padding: 15, 
-                                        borderWidth: 1, borderColor: isLatest ? theme.primary : theme.border,
-                                        shadowColor: "#000", shadowOffset: {width:0,height:2}, shadowOpacity: 0.05, elevation: 2
-                                    }}>
-                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                                            {(item.sys || item.dia) && (
-                                                <View style={{ backgroundColor: '#fef2f2', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', borderWidth: 1, borderColor: '#fecaca' }}>
-                                                    <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 16 }}>{item.sys}/{item.dia}</Text>
-                                                    <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: '600' }}>BP mmHg</Text>
-                                                </View>
-                                            )}
-                                            {item.spo2 && (
-                                                <View style={{ backgroundColor: '#f0f9ff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', borderWidth: 1, borderColor: '#bae6fd' }}>
-                                                    <Text style={{ color: '#0ea5e9', fontWeight: '800', fontSize: 16 }}>{item.spo2}%</Text>
-                                                    <Text style={{ color: '#0ea5e9', fontSize: 10, fontWeight: '600' }}>SpO2</Text>
-                                                </View>
-                                            )}
-                                            {item.pulse && (
-                                                <View style={{ backgroundColor: '#faf5ff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', borderWidth: 1, borderColor: '#e9d5ff' }}>
-                                                    <Text style={{ color: '#a855f7', fontWeight: '800', fontSize: 16 }}>{item.pulse}</Text>
-                                                    <Text style={{ color: '#a855f7', fontSize: 10, fontWeight: '600' }}>BPM</Text>
-                                                </View>
-                                            )}
-                                            {item.weight && (
-                                                <View style={{ backgroundColor: '#f0fdf4', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', borderWidth: 1, borderColor: '#bbf7d0' }}>
-                                                    <Text style={{ color: '#22c55e', fontWeight: '800', fontSize: 16 }}>{item.weight}</Text>
-                                                    <Text style={{ color: '#22c55e', fontSize: 10, fontWeight: '600' }}>kg</Text>
-                                                </View>
-                                            )}
-                                            {item.temp && (
-                                                <View style={{ backgroundColor: '#fffbeb', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', borderWidth: 1, borderColor: '#fde68a' }}>
-                                                    <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 16 }}>{item.temp}°</Text>
-                                                    <Text style={{ color: '#d97706', fontSize: 10, fontWeight: '600' }}>Temp {item.tempUnit || 'C'}</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 15, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 10, marginTop: 5 }}>
-                                            <TouchableOpacity onPress={() => handleEdit(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                                <Pencil size={14} color={theme.textDim} />
-                                                <Text style={{ fontSize: 12, color: theme.textDim, fontWeight: '600' }}>Edit</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity onPress={() => handleDelete(item.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                                <Trash2 size={14} color="#ef4444" />
-                                                <Text style={{ fontSize: 12, color: "#ef4444", fontWeight: '600' }}>Remove</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                </View>
-                            </View>
-                        );
-                    })}
-                </View>
-
-                {history.length === 0 && (
-                    <View style={{ alignItems: 'center', marginTop: 30, opacity: 0.5 }}>
-                        <Activity size={40} color={theme.textDim} />
-                        <Text style={{ color: theme.textDim, marginTop: 10 }}>No vitals history recorded yet.</Text>
-                    </View>
-                )}
             </ScrollView>
         </View>
     );
@@ -1731,7 +1990,8 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
             blood: newPatient.blood || 'O+',
             address: newPatient.address,
             registeredDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            vitalsHistory: []
+            vitalsHistory: [],
+            rxHistory: []
         };
         setPatients([createdPatient, ...patients]);
         setAddVisible(false);
@@ -1936,9 +2196,10 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
 
         const ACTIONS = [
             { id: 1, title: 'Add Vitals', icon: HeartPulse, colors: ['#2dd4bf', '#0f766e'], action: () => onNavigate('vitals', selectedPatient) },
-            { id: 2, title: 'Prescribe now', icon: FilePlus, colors: ['#a78bfa', '#8b5cf6'], action: () => Alert.alert("Coming Soon", "Prescription module") },
+            // UPDATED ACTION: Navigate to prescription writer
+            { id: 2, title: 'Prescribe now', icon: FilePlus, colors: ['#a78bfa', '#8b5cf6'], action: () => onNavigate('prescription', selectedPatient) },
             { id: 5, title: 'Add Lab Report', icon: TestTube, colors: ['#60a5fa', '#3b82f6'], action: () => Alert.alert("Coming Soon", "Lab Reports") },
-            { id: 6, title: 'Rx History', icon: Clock, colors: ['#fbbf24', '#f59e0b'], action: () => Alert.alert("Coming Soon", "History") },
+            // REMOVED Rx History as requested
         ];
 
         return (
@@ -2548,7 +2809,8 @@ const AppointmentScreen = ({ theme, onBack, form, setForm, appointments, setAppo
                     blood: finalBlood,
                     address: form.address || "",
                     registeredDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                    vitalsHistory: []
+                    vitalsHistory: [],
+                    rxHistory: []
                 };
                 setPatients(prev => [newPatient, ...prev]);
             }
@@ -3205,6 +3467,30 @@ const MainApp = () => {
         setPatients(updatedPatients);
     };
 
+    const handleSavePrescription = (prescription) => {
+        const patientId = prescription.patientId;
+        const newRecord = {
+            id: Date.now(),
+            date: new Date().toISOString(),
+            diagnosis: prescription.diagnosis,
+            medicines: prescription.medicines,
+            procedures: prescription.procedures, // NEW: Include procedures
+            advice: prescription.advice
+        };
+
+        const updatedPatients = patients.map(p => {
+            if (p.id === patientId) {
+                const currentHistory = p.rxHistory || [];
+                return { ...p, rxHistory: [newRecord, ...currentHistory] };
+            }
+            return p;
+        });
+
+        setPatients(updatedPatients);
+        showToast('Prescribed', 'Prescription saved to patient history.', 'success');
+        setCurrentScreen('patients');
+    };
+
     const handleSelectPatientFromAppt = (appt) => {
         const patient = patients.find(p => p.mobile === appt.mobile || p.name === appt.name);
         if (patient) {
@@ -3327,7 +3613,8 @@ const MainApp = () => {
                     selectedPatientId={selectedPatientId}
                     onBookAppointment={handleBookFromProfile}
                     onNavigate={(screen, data) => {
-                        if (screen === 'vitals') { setSelectedPatientId(data.id); setCurrentScreen('vitals'); } 
+                        if (screen === 'vitals') { setSelectedPatientId(data.id); setCurrentScreen('vitals'); }
+                        else if (screen === 'prescription') { setSelectedPatientId(data.id); setCurrentScreen('prescription'); }
                         else { setCurrentScreen(screen); }
                     }}
                     showToast={showToast}
@@ -3335,6 +3622,22 @@ const MainApp = () => {
             case 'vitals':
                 const patientForVitals = patients.find(p => p.id === selectedPatientId);
                 return <VitalsScreen theme={theme} onBack={() => setCurrentScreen('patients')} patient={patientForVitals} onSaveVitals={handleSaveVitals} showToast={showToast} />;
+            case 'prescription':
+                const patientForRx = patients.find(p => p.id === selectedPatientId);
+                return <TemplateScreen 
+                    theme={theme} 
+                    onBack={() => setCurrentScreen('patients')}
+                    templates={templates}
+                    setTemplates={setTemplates}
+                    medicines={medicines}
+                    setMedicines={setMedicines}
+                    procedures={procedures} // NEW PROP PASSED
+                    setProcedures={setProcedures} // NEW: Pass setter
+                    showToast={showToast}
+                    isPrescription={true}
+                    patient={patientForRx}
+                    onSavePrescription={handleSavePrescription}
+                />;
             case 'medicines': return <MedicineScreen theme={theme} onBack={() => setCurrentScreen('home')} medicines={medicines} setMedicines={setMedicines} showToast={showToast} />;
             case 'templates': 
                 return <TemplateScreen 
@@ -3344,6 +3647,8 @@ const MainApp = () => {
                     setTemplates={setTemplates}
                     medicines={medicines}
                     setMedicines={setMedicines}
+                    procedures={procedures} // NEW PROP PASSED
+                    setProcedures={setProcedures} // NEW: Pass setter
                     showToast={showToast}
                 />;
             case 'procedures': 
@@ -3405,62 +3710,354 @@ const MainApp = () => {
 };
 
 export default function App() { return <SafeAreaProvider><MainApp /></SafeAreaProvider>; }
-
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 16, paddingHorizontal: 15, paddingVertical: 4, height: 55 },
-  textInput: { flex: 1, marginLeft: 10, fontSize: 16, height: '100%' },
-  loginBtn: { paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#2563eb', shadowOffset: {width:0, height:8}, shadowOpacity:0.3, shadowRadius:10, elevation:10 },
-  glowTop: { position: 'absolute', top: -100, left: -50, width: 300, height: 300, borderRadius: 150, transform: [{ scaleX: 1.5 }] },
-  glowBottom: { position: 'absolute', bottom: -100, right: -50, width: 300, height: 300, borderRadius: 150 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 25 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  greeting: { fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
-  dateContainer: { flexDirection: 'row', alignItems: 'center' },
-  dateText: { fontSize: 14 },
-  timeText: { fontWeight: 'bold', fontSize: 14 },
-  dot: { width: 4, height: 4, borderRadius: 2, marginHorizontal: 8 },
-  iconBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  heroContainer: { marginHorizontal: 20, height: 190, borderRadius: 24, shadowColor: '#3b82f6', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10, marginBottom: 30 },
-  heroGradient: { flex: 1, borderRadius: 24, padding: 20, justifyContent: 'space-between', borderWidth: 1 },
-  heroContent: { position: 'relative', flexDirection: 'row', justifyContent: 'space-between' },
-  heroBgIcon: { position: 'absolute', right: -10, top: -10, transform: [{ rotate: '-15deg' }] },
-  badge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },
-  badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
-  surahName: { color: 'white', fontSize: 28, fontWeight: 'bold', marginBottom: 4 },
-  ayahInfo: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
-  heroActions: { flexDirection: 'row', gap: 12 },
-  resumeBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, gap: 6 },
-  resumeText: { fontWeight: 'bold', fontSize: 14 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginLeft: 20, marginBottom: 15 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15, justifyContent: 'space-between' },
-  cardContainer: { width: '48%', marginBottom: 15 },
-  cardInner: { borderRadius: 20, padding: 16, height: 130, justifyContent: 'space-between', borderWidth: 1 },
-  iconBox: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', elevation: 8 },
-  cardTextContent: { marginTop: 10 },
-  cardTitle: { fontSize: 15, fontWeight: 'bold' },
-  cardSubtitle: { fontSize: 11 },
-  comingSoonIconContainer: { width: 120, height: 120, borderRadius: 60, elevation: 20, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20, marginBottom: 40 },
-  comingSoonGradient: { flex: 1, borderRadius: 60, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' },
-  comingSoonTitle: { fontSize: 28, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
-  comingSoonDesc: { fontSize: 15, textAlign: 'center', lineHeight: 24, paddingHorizontal: 40 },
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingTop: 15, borderTopWidth: 1 },
-  bottomNavLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 1 },
-  navItem: { alignItems: 'center', gap: 4, padding: 10, minWidth: 50 },
-  navText: { fontSize: 10, fontWeight: '500' },
-  menuOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  menuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  menuSidebar: { position: 'absolute', top: 0, left: 0, bottom: 0, width: '80%', borderRightWidth: 1, paddingHorizontal: 20 },
-  menuHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30, marginTop: 20 },
-  closeBtn: { padding: 5, borderRadius: 8 },
-  menuItems: { flex: 1 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 15, borderBottomWidth: 1 },
-  menuItemText: { fontSize: 16 },
-  menuDivider: { height: 1, marginVertical: 20 },
-  menuVersion: { fontSize: 12, textAlign: 'center', marginTop: 20, marginBottom: 40 },
-  menuSectionTitle: { fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 10, marginTop: 10 },
-  menuFeatureItem: { flexDirection: 'row', alignItems: 'center', gap: 15, paddingVertical: 12, borderBottomWidth: 1 },
-  menuFeatureIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  // --- LAYOUT & BASICS ---
+  container: { 
+    flex: 1 
+  },
+  inputContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    borderRadius: 16, 
+    paddingHorizontal: 15, 
+    paddingVertical: 4, 
+    height: 55 
+  },
+  textInput: { 
+    flex: 1, 
+    marginLeft: 10, 
+    fontSize: 16, 
+    height: '100%' 
+  },
+  
+  // --- LOGIN SCREEN ---
+  loginBtn: { 
+    paddingVertical: 16, 
+    borderRadius: 16, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    shadowColor: '#2563eb', 
+    shadowOffset: {width:0, height:8}, 
+    shadowOpacity:0.3, 
+    shadowRadius:10, 
+    elevation:10 
+  },
+  glowTop: { 
+    position: 'absolute', 
+    top: -100, 
+    left: -50, 
+    width: 300, 
+    height: 300, 
+    borderRadius: 150, 
+    transform: [{ scaleX: 1.5 }] 
+  },
+  glowBottom: { 
+    position: 'absolute', 
+    bottom: -100, 
+    right: -50, 
+    width: 300, 
+    height: 300, 
+    borderRadius: 150 
+  },
+
+  // --- HEADERS ---
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 20, 
+    marginBottom: 25 
+  },
+  headerTitle: { 
+    fontSize: 20, 
+    fontWeight: 'bold' 
+  },
+  greeting: { 
+    fontSize: 22, 
+    fontWeight: 'bold', 
+    marginBottom: 4 
+  },
+  dateContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
+  dateText: { 
+    fontSize: 14 
+  },
+  timeText: { 
+    fontWeight: 'bold', 
+    fontSize: 14 
+  },
+  dot: { 
+    width: 4, 
+    height: 4, 
+    borderRadius: 2, 
+    marginHorizontal: 8 
+  },
+  iconBtn: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    borderWidth: 1 
+  },
+
+  // --- HERO / DASHBOARD CARD ---
+  heroContainer: { 
+    marginHorizontal: 20, 
+    height: 190, 
+    borderRadius: 24, 
+    shadowColor: '#3b82f6', 
+    shadowOffset: { width: 0, height: 10 }, 
+    shadowOpacity: 0.3, 
+    shadowRadius: 20, 
+    elevation: 10, 
+    marginBottom: 30 
+  },
+  heroGradient: { 
+    flex: 1, 
+    borderRadius: 24, 
+    padding: 20, 
+    justifyContent: 'space-between', 
+    borderWidth: 1 
+  },
+  heroContent: { 
+    position: 'relative', 
+    flexDirection: 'row', 
+    justifyContent: 'space-between' 
+  },
+  heroBgIcon: { 
+    position: 'absolute', 
+    right: -10, 
+    top: -10, 
+    transform: [{ rotate: '-15deg' }] 
+  },
+  badge: { 
+    backgroundColor: 'rgba(255,255,255,0.2)', 
+    paddingHorizontal: 10, 
+    paddingVertical: 4, 
+    borderRadius: 12, 
+    alignSelf: 'flex-start' 
+  },
+  badgeText: { 
+    color: 'white', 
+    fontSize: 10, 
+    fontWeight: 'bold', 
+    textTransform: 'uppercase' 
+  },
+  surahName: { 
+    color: 'white', 
+    fontSize: 28, 
+    fontWeight: 'bold', 
+    marginBottom: 4 
+  },
+  ayahInfo: { 
+    color: 'rgba(255,255,255,0.8)', 
+    fontSize: 14 
+  },
+  heroActions: { 
+    flexDirection: 'row', 
+    gap: 12 
+  },
+  resumeBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: 'white', 
+    paddingHorizontal: 20, 
+    paddingVertical: 12, 
+    borderRadius: 12, 
+    gap: 6 
+  },
+  resumeText: { 
+    fontWeight: 'bold', 
+    fontSize: 14 
+  },
+
+  // --- GRID & FEATURES ---
+  sectionTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    marginLeft: 20, 
+    marginBottom: 15 
+  },
+  grid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    paddingHorizontal: 15, 
+    justifyContent: 'space-between' 
+  },
+  cardContainer: { 
+    width: '48%', 
+    marginBottom: 15 
+  },
+  cardInner: { 
+    borderRadius: 20, 
+    padding: 16, 
+    height: 130, 
+    justifyContent: 'space-between', 
+    borderWidth: 1 
+  },
+  iconBox: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 14, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    elevation: 8 
+  },
+  cardTextContent: { 
+    marginTop: 10 
+  },
+  cardTitle: { 
+    fontSize: 15, 
+    fontWeight: 'bold' 
+  },
+  cardSubtitle: { 
+    fontSize: 11 
+  },
+
+  // --- PLACEHOLDER SCREENS ---
+  comingSoonIconContainer: { 
+    width: 120, 
+    height: 120, 
+    borderRadius: 60, 
+    elevation: 20, 
+    shadowOffset: { width: 0, height: 10 }, 
+    shadowOpacity: 0.5, 
+    shadowRadius: 20, 
+    marginBottom: 40 
+  },
+  comingSoonGradient: { 
+    flex: 1, 
+    borderRadius: 60, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    borderWidth: 2, 
+    borderColor: 'rgba(255,255,255,0.2)' 
+  },
+  comingSoonTitle: { 
+    fontSize: 28, 
+    fontWeight: 'bold', 
+    marginBottom: 15, 
+    textAlign: 'center' 
+  },
+  comingSoonDesc: { 
+    fontSize: 15, 
+    textAlign: 'center', 
+    lineHeight: 24, 
+    paddingHorizontal: 40 
+  },
+
+  // --- BOTTOM NAVIGATION ---
+  bottomNav: { 
+    position: 'absolute', 
+    bottom: 0, 
+    left: 0, 
+    right: 0, 
+    flexDirection: 'row', 
+    justifyContent: 'space-around', 
+    alignItems: 'center', 
+    paddingTop: 15, 
+    borderTopWidth: 1 
+  },
+  bottomNavLine: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    height: 1 
+  },
+  navItem: { 
+    alignItems: 'center', 
+    gap: 4, 
+    padding: 10, 
+    minWidth: 50 
+  },
+  navText: { 
+    fontSize: 10, 
+    fontWeight: '500' 
+  },
+
+  // --- SIDE MENU (3D) ---
+  menuOverlay: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    bottom: 0 
+  },
+  menuBackdrop: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)' 
+  },
+  menuSidebar: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    bottom: 0, 
+    width: '80%', 
+    borderRightWidth: 1, 
+    paddingHorizontal: 20 
+  },
+  menuHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 30, 
+    marginTop: 20 
+  },
+  closeBtn: { 
+    padding: 5, 
+    borderRadius: 8 
+  },
+  menuItems: { 
+    flex: 1 
+  },
+  menuItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingVertical: 15, 
+    borderBottomWidth: 1 
+  },
+  menuItemText: { 
+    fontSize: 16 
+  },
+  menuDivider: { 
+    height: 1, 
+    marginVertical: 20 
+  },
+  menuVersion: { 
+    fontSize: 12, 
+    textAlign: 'center', 
+    marginTop: 20, 
+    marginBottom: 40 
+  },
+  menuSectionTitle: { 
+    fontSize: 12, 
+    fontWeight: 'bold', 
+    textTransform: 'uppercase', 
+    marginBottom: 10, 
+    marginTop: 10 
+  },
+  menuFeatureItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 15, 
+    paddingVertical: 12, 
+    borderBottomWidth: 1 
+  },
+  menuFeatureIconBox: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 10, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+
+  // --- TOAST NOTIFICATIONS ---
   toastContainer: {
     position: 'absolute',
     top: 0,
@@ -3499,4 +4096,5 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     fontSize: 13
   }
-})
+});
+  
