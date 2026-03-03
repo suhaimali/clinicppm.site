@@ -217,17 +217,8 @@ const INITIAL_TEMPLATES = [
             { id: 1, name: "Paracetamol", dosage: "1 Tablet (500mg)", freq: "1-1-1", duration: "3 Days", instruction: "After Food", type: "Tablet" },
             { id: 2, name: "Vitamin C", dosage: "1 Tablet (500mg)", freq: "1-0-0", duration: "5 Days", instruction: "After Food", type: "Tablet" }
         ],
-        procedures: []
-    },
-    { 
-        id: 2, 
-        name: "General Pain", 
-        diagnosis: "Myalgia / Body Pain", 
-        advice: "Apply hot pack on affected area. Avoid heavy lifting.",
-        medicines: [
-            { id: 3, name: "Ibuprofen", dosage: "1 Tablet (400mg)", freq: "1-0-1", duration: "3 Days", instruction: "After Food", type: "Tablet" }
-        ],
-        procedures: []
+        procedures: [],
+        nextVisitInvestigations: []
     },
 ];
 
@@ -763,14 +754,17 @@ const SupportScreen = ({ theme, onBack }) => {
     );
 };
 
-// --- UPDATED TEMPLATE SCREEN WITH ENHANCED PROCEDURES UI ---
+// --- UPDATED TEMPLATE SCREEN ---
 const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, setMedicines, procedures, setProcedures, showToast, isPrescription = false, patient, onSavePrescription }) => {
     const insets = useSafeAreaInsets();
     const [view, setView] = useState('list'); 
     const [searchQuery, setSearchQuery] = useState('');
     
-    // Editor State
-    const [editorForm, setEditorForm] = useState({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [] });
+    // Editor State - Added 'nextVisitInvestigations'
+    const [editorForm, setEditorForm] = useState({ 
+        id: null, name: '', diagnosis: '', advice: '', 
+        medicines: [], procedures: [], nextVisitInvestigations: [] 
+    });
     const [saveAsTemplate, setSaveAsTemplate] = useState(false);
     
     // View Modal State
@@ -781,8 +775,9 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
     const [medModalVisible, setMedModalVisible] = useState(false);
     const [medSearch, setMedSearch] = useState('');
 
-    // --- NEW PROCEDURE STATES ---
+    // --- PROCEDURE / INVESTIGATION STATES ---
     const [procModalVisible, setProcModalVisible] = useState(false);
+    const [procModalType, setProcModalType] = useState('procedure'); // 'procedure' or 'investigation'
     const [procSearch, setProcSearch] = useState('');
     const [procViewMode, setProcViewMode] = useState('list'); // 'list' | 'add_master' | 'edit_master'
     const [showCustomInput, setShowCustomInput] = useState(false);
@@ -790,7 +785,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
     // Form for Adding/Editing Master Procedure
     const [masterProcForm, setMasterProcForm] = useState({ id: null, name: '', cost: '', category: 'General' });
     
-    // Form for Custom Investigation (One-off)
+    // Form for Custom (One-off)
     const [customProcForm, setCustomProcForm] = useState({ name: '', cost: '' });
 
     // Template Selection Modal for Rx Writer
@@ -816,7 +811,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
     useEffect(() => {
         if (isPrescription) {
             setView('edit');
-            setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [] });
+            setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [] });
         }
     }, [isPrescription]);
 
@@ -826,19 +821,26 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
             diagnosis: template.diagnosis || prev.diagnosis,
             advice: template.advice || prev.advice,
             medicines: [...prev.medicines, ...template.medicines],
-            procedures: [...prev.procedures, ...(template.procedures || [])]
+            procedures: [...prev.procedures, ...(template.procedures || [])],
+            // Assuming templates might have investigations in future, for now empty or spread if added to template structure
+            nextVisitInvestigations: [...prev.nextVisitInvestigations, ...(template.nextVisitInvestigations || [])]
         }));
         setShowTemplatePicker(false);
         showToast('Applied', `${template.name} loaded successfully`, 'info');
     };
 
     const handleEdit = (item) => {
-        setEditorForm({ ...item, medicines: [...item.medicines], procedures: [...(item.procedures || [])] });
+        setEditorForm({ 
+            ...item, 
+            medicines: [...item.medicines], 
+            procedures: [...(item.procedures || [])],
+            nextVisitInvestigations: [...(item.nextVisitInvestigations || [])]
+        });
         setView('edit');
     };
 
     const handleCreate = () => {
-        setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [] });
+        setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [] });
         setView('edit');
     };
 
@@ -846,8 +848,8 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         if (!isPrescription && !editorForm.name) { Alert.alert("Required", "Please enter a Template Name."); return; }
         
         if (isPrescription) {
-            if (editorForm.medicines.length === 0 && !editorForm.advice && editorForm.procedures.length === 0) {
-                Alert.alert("Empty", "Please add medicines, procedures, or advice."); return;
+            if (editorForm.medicines.length === 0 && !editorForm.advice && editorForm.procedures.length === 0 && editorForm.nextVisitInvestigations.length === 0) {
+                Alert.alert("Empty", "Please add medicines, procedures, investigations or advice."); return;
             }
             onSavePrescription({
                 ...editorForm,
@@ -859,9 +861,6 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                  const newTemplate = { ...editorForm, id: Date.now() };
                  setTemplates([newTemplate, ...templates]);
                  showToast('Saved', 'Prescription & New Template Saved!', 'success');
-            } else if (saveAsTemplate && !editorForm.name) {
-                 Alert.alert("Template Name Required", "Please enter a Template Name to save this as a template.");
-                 return;
             }
             return;
         }
@@ -891,60 +890,61 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         setViewModalVisible(true);
     };
 
-    // --- PROCEDURE LOGIC START ---
+    // --- PROCEDURE / INVESTIGATION LOGIC ---
     
-    // Add item to prescription form
+    // Add item to form (Handles both Procedures and Investigations)
     const addProcedureToForm = (proc) => {
+        const targetList = procModalType === 'investigation' ? 'nextVisitInvestigations' : 'procedures';
+        const newItem = { ...proc, id: Date.now() }; // New ID for the instance in Rx
+
         setEditorForm(prev => ({
              ...prev,
-             procedures: [...prev.procedures, { ...proc, id: Date.now() }]
+             [targetList]: [...prev[targetList], newItem]
         }));
+        
         setProcModalVisible(false);
-        showToast('Added', 'Procedure added to prescription', 'success');
+        showToast('Added', `${procModalType === 'investigation' ? 'Investigation' : 'Procedure'} added`, 'success');
     };
 
-    // Delete item from MASTER list
+    // Save New/Edited Master Procedure (Inventory)
+    const handleSaveMasterProcedure = () => {
+        if(!masterProcForm.name) {
+            Alert.alert("Missing Info", "Name is required.");
+            return;
+        }
+        
+        if (masterProcForm.id) {
+            const updated = procedures.map(p => p.id === masterProcForm.id ? masterProcForm : p);
+            setProcedures(updated);
+            showToast('Updated', 'Master list updated', 'success');
+        } else {
+            const newProc = { ...masterProcForm, id: Date.now(), category: masterProcForm.category || 'General' };
+            setProcedures([newProc, ...procedures]);
+            showToast('Created', 'New item added to master list', 'success');
+        }
+        setProcViewMode('list');
+    };
+
     const handleDeleteMasterProcedure = (id) => {
         Alert.alert("Delete", "Permanently remove from master list?", [
             { text: "Cancel" },
             { text: "Delete", style: 'destructive', onPress: () => {
                 setProcedures(procedures.filter(p => p.id !== id));
-                showToast('Deleted', 'Procedure removed from master list', 'error');
+                showToast('Deleted', 'Item removed', 'error');
             }}
         ]);
     };
 
-    // Save New/Edited Master Procedure
-    const handleSaveMasterProcedure = () => {
-        if(!masterProcForm.name || !masterProcForm.cost) {
-            Alert.alert("Missing Info", "Name and Price are required.");
-            return;
-        }
-        
-        if (masterProcForm.id) {
-            // Edit existing
-            const updated = procedures.map(p => p.id === masterProcForm.id ? masterProcForm : p);
-            setProcedures(updated);
-            showToast('Updated', 'Procedure updated successfully', 'success');
-        } else {
-            // Create new
-            const newProc = { ...masterProcForm, id: Date.now(), category: 'General' }; // Default category or could add picker
-            setProcedures([newProc, ...procedures]);
-            showToast('Created', 'New procedure added to master list', 'success');
-        }
-        setProcViewMode('list');
-    };
-
-    // Add One-Off Custom Procedure to Rx
+    // Add One-Off Custom Item
     const addCustomToRx = () => {
-        if (!customProcForm.name || !customProcForm.cost) {
-            Alert.alert("Missing Info", "Name and Price are required");
+        if (!customProcForm.name) {
+            Alert.alert("Missing Info", "Name is required");
             return;
         }
         const customProc = {
             id: Date.now(),
             name: customProcForm.name,
-            cost: customProcForm.cost,
+            cost: customProcForm.cost || '0',
             category: 'Custom'
         };
         addProcedureToForm(customProc);
@@ -952,10 +952,12 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         setShowCustomInput(false);
     };
 
-    const removeProcedureFromRx = (index) => {
-        const updated = [...editorForm.procedures];
+    // Generic remover
+    const removeItemFromForm = (index, type) => {
+        const targetList = type === 'investigation' ? 'nextVisitInvestigations' : 'procedures';
+        const updated = [...editorForm[targetList]];
         updated.splice(index, 1);
-        setEditorForm({ ...editorForm, procedures: updated });
+        setEditorForm({ ...editorForm, [targetList]: updated });
     };
 
     const calculateTotalCost = () => {
@@ -971,7 +973,24 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         setMasterProcForm({ ...item });
         setProcViewMode('edit_master');
     };
-    // --- PROCEDURE LOGIC END ---
+
+    // Open Modal Helpers
+    const openProcedureModal = () => {
+        setProcModalType('procedure');
+        setProcViewMode('list');
+        setProcSearch('');
+        setShowCustomInput(false);
+        setProcModalVisible(true);
+    };
+
+    const openInvestigationModal = () => {
+        setProcModalType('investigation');
+        setProcViewMode('list');
+        setProcSearch('');
+        setShowCustomInput(false);
+        setProcModalVisible(true);
+    };
+    // --- END PROCEDURE LOGIC ---
 
     const removeMedFromTemplate = (index) => {
         const updated = [...editorForm.medicines];
@@ -1255,7 +1274,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                     <Settings size={16} color={theme.textDim} />
                     <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>PROCEDURES / SERVICES</Text>
                 </View>
-                <TouchableOpacity onPress={() => { setProcModalVisible(true); setProcViewMode('list'); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.inputBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.border }}>
+                <TouchableOpacity onPress={openProcedureModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.inputBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.border }}>
                     <PlusCircle size={16} color={theme.primary} />
                     <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>Add Procedure</Text>
                 </TouchableOpacity>
@@ -1270,7 +1289,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
                              <Text style={{ fontWeight: 'bold', color: theme.primary, fontSize: 16 }}>₹{proc.cost}</Text>
-                             <TouchableOpacity onPress={() => removeProcedureFromRx(index)} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 10 }}><Trash2 size={18} color="#ef4444" /></TouchableOpacity>
+                             <TouchableOpacity onPress={() => removeItemFromForm(index, 'procedure')} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 10 }}><Trash2 size={18} color="#ef4444" /></TouchableOpacity>
                         </View>
                     </View>
                 ))}
@@ -1280,6 +1299,36 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                         <Text style={{ color: theme.textDim, fontSize: 12 }}>Total Estimated Cost: <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16 }}>₹{calculateTotalCost()}</Text></Text>
                     </View>
                 )}
+            </View>
+
+            {/* --- INVESTIGATIONS ON NEXT VISIT SECTION (NEW) --- */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TestTube size={16} color={theme.textDim} />
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>INVESTIGATION ON NEXT VISIT</Text>
+                </View>
+                <TouchableOpacity onPress={openInvestigationModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.inputBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.border }}>
+                    <PlusCircle size={16} color={theme.primary} />
+                    <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>Add Investigation</Text>
+                </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 12, marginBottom: 25 }}>
+                {(editorForm.nextVisitInvestigations || []).map((item, index) => (
+                     <View key={index} style={{ backgroundColor: theme.cardBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: "#000", shadowOffset: {width:0,height:2}, shadowOpacity:0.05, elevation:2 }}>
+                        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+                            <View style={{width: 32, height: 32, borderRadius: 8, backgroundColor: '#f0f9ff', alignItems:'center', justifyContent:'center'}}>
+                                <TestTube size={16} color="#0284c7" />
+                            </View>
+                            <View>
+                                <Text style={{ fontWeight: 'bold', color: theme.text, fontSize: 15 }}>{item.name}</Text>
+                                <Text style={{ fontSize: 12, color: theme.textDim }}>Next Visit</Text>
+                            </View>
+                        </View>
+                        <TouchableOpacity onPress={() => removeItemFromForm(index, 'investigation')} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 10 }}><Trash2 size={18} color="#ef4444" /></TouchableOpacity>
+                    </View>
+                ))}
+                {(editorForm.nextVisitInvestigations || []).length === 0 && <View style={{ padding: 20, borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed', borderRadius: 16, alignItems: 'center', backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: '600' }}>No investigations added.</Text></View>}
             </View>
 
             <InputGroup icon={Clipboard} label="Advice / Notes" value={editorForm.advice} onChange={t => setEditorForm({...editorForm, advice: t})} theme={theme} multiline placeholder="Enter patient advice (e.g., Drink warm water)..." />
@@ -1463,6 +1512,10 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         
         // Helper to get category details
         const getCatInfo = (catName) => PROCEDURE_CATEGORIES.find(c => c.value === catName) || PROCEDURE_CATEGORIES[0];
+        
+        // Dynamic Title based on Type
+        const modalTitle = procModalType === 'investigation' ? 'Add Investigation' : 'Add Procedure';
+        const customBtnLabel = procModalType === 'investigation' ? 'Add Custom Investigation' : 'Add Custom Procedure';
 
         // Content to render based on view mode
         const renderModalContent = () => {
@@ -1471,7 +1524,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                     <View style={{flex: 1}}>
                          {/* Header */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
-                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>Add Procedure</Text>
+                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{modalTitle}</Text>
                             <TouchableOpacity onPress={() => setProcModalVisible(false)} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}><X size={20} color={theme.textDim} /></TouchableOpacity>
                         </View>
 
@@ -1487,7 +1540,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                         <View style={{ marginBottom: 15 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: theme.border }}>
                                 <Search size={20} color={theme.textDim} style={{ marginRight: 10 }} />
-                                <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} placeholder="Search procedure name..." placeholderTextColor={theme.textDim} value={procSearch} onChangeText={setProcSearch} />
+                                <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} placeholder="Search name..." placeholderTextColor={theme.textDim} value={procSearch} onChangeText={setProcSearch} />
                                 {procSearch.length > 0 && <TouchableOpacity onPress={() => setProcSearch('')}><X size={18} color={theme.textDim} /></TouchableOpacity>}
                             </View>
                         </View>
@@ -1498,7 +1551,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                                  <View style={{width: 32, height: 32, borderRadius: 8, backgroundColor: '#f5f3ff', alignItems: 'center', justifyContent: 'center'}}>
                                      <FlaskConical size={18} color="#8b5cf6" />
                                  </View>
-                                 <Text style={{fontWeight: 'bold', color: theme.text}}>Add Custom Investigation</Text>
+                                 <Text style={{fontWeight: 'bold', color: theme.text}}>{customBtnLabel}</Text>
                              </View>
                              <ChevronDown size={20} color={theme.textDim} style={{transform: [{rotate: showCustomInput ? '180deg' : '0deg'}]}} />
                          </TouchableOpacity>
@@ -1506,12 +1559,14 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                          {/* Custom Input Fields (Visible only if toggled) */}
                          {showCustomInput && (
                              <View style={{backgroundColor: theme.inputBg, padding: 15, borderRadius: 16, marginBottom: 15, gap: 10}}>
-                                 <InputGroup icon={FileText} label="Procedure Name" value={customProcForm.name} onChange={t => setCustomProcForm({...customProcForm, name: t})} theme={theme} placeholder="e.g. X-Ray Chest" />
+                                 <InputGroup icon={FileText} label="Name" value={customProcForm.name} onChange={t => setCustomProcForm({...customProcForm, name: t})} theme={theme} placeholder="e.g. X-Ray Chest" />
                                  <View style={{flexDirection:'row', gap: 10, alignItems: 'flex-end'}}>
-                                     <View style={{flex: 1}}>
-                                         <InputGroup icon={Banknote} label="Price" value={customProcForm.cost} onChange={t => setCustomProcForm({...customProcForm, cost: t})} theme={theme} placeholder="0" keyboardType="numeric" />
-                                     </View>
-                                     <TouchableOpacity onPress={addCustomToRx} style={{backgroundColor: theme.primary, height: 55, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 4}}>
+                                     {procModalType === 'procedure' && (
+                                         <View style={{flex: 1}}>
+                                             <InputGroup icon={Banknote} label="Price" value={customProcForm.cost} onChange={t => setCustomProcForm({...customProcForm, cost: t})} theme={theme} placeholder="0" keyboardType="numeric" />
+                                         </View>
+                                     )}
+                                     <TouchableOpacity onPress={addCustomToRx} style={{backgroundColor: theme.primary, height: 55, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 4, flex: procModalType === 'investigation' ? 1 : 0}}>
                                          <Text style={{color: 'white', fontWeight: 'bold'}}>Add</Text>
                                      </TouchableOpacity>
                                  </View>
@@ -1535,7 +1590,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                                             <View style={{flex: 1}}>
                                                 <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 15 }}>{item.name}</Text>
                                                 <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-                                                    <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 13 }}>₹{item.cost}</Text>
+                                                    {procModalType === 'procedure' && <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 13 }}>₹{item.cost}</Text>}
                                                     <Text style={{ color: theme.textDim, fontSize: 12 }}>• {item.category}</Text>
                                                 </View>
                                             </View>
@@ -1563,14 +1618,14 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                 return (
                     <View style={{flex: 1}}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
-                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{procViewMode === 'edit_master' ? 'Edit Procedure' : 'Add New Procedure'}</Text>
+                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{procViewMode === 'edit_master' ? 'Edit Item' : 'Add New Item'}</Text>
                             <TouchableOpacity onPress={() => setProcViewMode('list')} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}><ArrowLeft size={20} color={theme.textDim} /></TouchableOpacity>
                         </View>
                         
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={{ gap: 15 }}>
-                                <InputGroup icon={Settings} label="Procedure Name *" value={masterProcForm.name} onChange={t => setMasterProcForm({...masterProcForm, name: t})} theme={theme} placeholder="Enter procedure name" />
-                                <InputGroup icon={Banknote} label="Price (₹) *" value={masterProcForm.cost} onChange={t => setMasterProcForm({...masterProcForm, cost: t})} theme={theme} placeholder="Enter price" keyboardType="numeric" />
+                                <InputGroup icon={Settings} label="Name *" value={masterProcForm.name} onChange={t => setMasterProcForm({...masterProcForm, name: t})} theme={theme} placeholder="Enter name" />
+                                <InputGroup icon={Banknote} label="Price (₹)" value={masterProcForm.cost} onChange={t => setMasterProcForm({...masterProcForm, cost: t})} theme={theme} placeholder="Enter price" keyboardType="numeric" />
                                 {/* Simple Category Selector for speed - could use CustomPicker if needed */}
                                 <View>
                                     <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Category</Text>
@@ -4097,4 +4152,3 @@ const styles = StyleSheet.create({
     fontSize: 13
   }
 });
-  
