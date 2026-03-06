@@ -790,6 +790,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
 
     // Template Selection Modal for Rx Writer
     const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+    const [templatePickerSearch, setTemplatePickerSearch] = useState('');
     
     // Dynamic Arrays
     const [freqOptions, setFreqOptions] = useState(FREQUENCIES_INIT);
@@ -1737,8 +1738,24 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                         <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>Select a Template</Text>
                         <TouchableOpacity onPress={() => setShowTemplatePicker(false)}><X size={24} color={theme.textDim} /></TouchableOpacity>
                     </View>
+                    
+                    {/* NEW: Template Search Bar */}
+                    <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingHorizontal: 10, height: 45, borderWidth: 1, borderColor: theme.border }}>
+                            <Search size={18} color={theme.textDim} style={{ marginRight: 8 }} />
+                            <TextInput 
+                                style={{ flex: 1, color: theme.text }}
+                                placeholder="Search templates..."
+                                placeholderTextColor={theme.textDim}
+                                value={templatePickerSearch}
+                                onChangeText={setTemplatePickerSearch}
+                            />
+                             {templatePickerSearch.length > 0 && <TouchableOpacity onPress={() => setTemplatePickerSearch('')}><X size={16} color={theme.textDim} /></TouchableOpacity>}
+                        </View>
+                    </View>
+
                     <FlatList 
-                        data={templates}
+                        data={templates.filter(t => t.name.toLowerCase().includes(templatePickerSearch.toLowerCase()))}
                         keyExtractor={(item) => item.id.toString()}
                         contentContainerStyle={{ padding: 20 }}
                         renderItem={({ item }) => (
@@ -2251,10 +2268,10 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
 
         const ACTIONS = [
             { id: 1, title: 'Add Vitals', icon: HeartPulse, colors: ['#2dd4bf', '#0f766e'], action: () => onNavigate('vitals', selectedPatient) },
-            // UPDATED ACTION: Navigate to prescription writer
             { id: 2, title: 'Prescribe now', icon: FilePlus, colors: ['#a78bfa', '#8b5cf6'], action: () => onNavigate('prescription', selectedPatient) },
+            // ADDED Rx History BACK
+            { id: 3, title: 'Rx History', icon: Clipboard, colors: ['#f97316', '#c2410c'], action: () => Alert.alert("Rx History", `View history for ${selectedPatient.name}`) }, 
             { id: 5, title: 'Add Lab Report', icon: TestTube, colors: ['#60a5fa', '#3b82f6'], action: () => Alert.alert("Coming Soon", "Lab Reports") },
-            // REMOVED Rx History as requested
         ];
 
         return (
