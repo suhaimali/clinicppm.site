@@ -1,3 +1,4 @@
+
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -218,7 +219,8 @@ const INITIAL_TEMPLATES = [
             { id: 2, name: "Vitamin C", dosage: "1 Tablet (500mg)", freq: "1-0-0", duration: "5 Days", instruction: "After Food", type: "Tablet" }
         ],
         procedures: [],
-        nextVisitInvestigations: []
+        nextVisitInvestigations: [],
+        referral: ''
     },
 ];
 
@@ -760,13 +762,16 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
     const [view, setView] = useState('list'); 
     const [searchQuery, setSearchQuery] = useState('');
     
-    // Editor State - Added 'nextVisitInvestigations'
+    // Editor State - Added 'nextVisitInvestigations' and 'referral'
     const [editorForm, setEditorForm] = useState({ 
         id: null, name: '', diagnosis: '', advice: '', 
-        medicines: [], procedures: [], nextVisitInvestigations: [] 
+        medicines: [], procedures: [], nextVisitInvestigations: [], referral: '' 
     });
     const [saveAsTemplate, setSaveAsTemplate] = useState(false);
     
+    // State to toggle referral input visibility
+    const [showReferral, setShowReferral] = useState(false);
+
     // View Modal State
     const [viewModalVisible, setViewModalVisible] = useState(false);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -812,7 +817,8 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
     useEffect(() => {
         if (isPrescription) {
             setView('edit');
-            setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [] });
+            setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [], referral: '' });
+            setShowReferral(false);
         }
     }, [isPrescription]);
 
@@ -823,9 +829,10 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
             advice: template.advice || prev.advice,
             medicines: [...prev.medicines, ...template.medicines],
             procedures: [...prev.procedures, ...(template.procedures || [])],
-            // Assuming templates might have investigations in future, for now empty or spread if added to template structure
-            nextVisitInvestigations: [...prev.nextVisitInvestigations, ...(template.nextVisitInvestigations || [])]
+            nextVisitInvestigations: [...prev.nextVisitInvestigations, ...(template.nextVisitInvestigations || [])],
+            referral: template.referral || prev.referral
         }));
+        if(template.referral) setShowReferral(true);
         setShowTemplatePicker(false);
         showToast('Applied', `${template.name} loaded successfully`, 'info');
     };
@@ -837,11 +844,13 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
             procedures: [...(item.procedures || [])],
             nextVisitInvestigations: [...(item.nextVisitInvestigations || [])]
         });
+        if(item.referral) setShowReferral(true);
         setView('edit');
     };
 
     const handleCreate = () => {
-        setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [] });
+        setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [], referral: '' });
+        setShowReferral(false);
         setView('edit');
     };
 
@@ -849,8 +858,8 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
         if (!isPrescription && !editorForm.name) { Alert.alert("Required", "Please enter a Template Name."); return; }
         
         if (isPrescription) {
-            if (editorForm.medicines.length === 0 && !editorForm.advice && editorForm.procedures.length === 0 && editorForm.nextVisitInvestigations.length === 0) {
-                Alert.alert("Empty", "Please add medicines, procedures, investigations or advice."); return;
+            if (editorForm.medicines.length === 0 && !editorForm.advice && editorForm.procedures.length === 0 && editorForm.nextVisitInvestigations.length === 0 && !editorForm.referral) {
+                Alert.alert("Empty", "Please add medicines, procedures, investigations, referral or advice."); return;
             }
             onSavePrescription({
                 ...editorForm,
@@ -1332,6 +1341,38 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                 {(editorForm.nextVisitInvestigations || []).length === 0 && <View style={{ padding: 20, borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed', borderRadius: 16, alignItems: 'center', backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: '600' }}>No investigations added.</Text></View>}
             </View>
 
+            {/* --- UPDATED REFERRAL SECTION --- */}
+            <View style={{ marginBottom: 20 }}>
+                {!showReferral ? (
+                    <TouchableOpacity onPress={() => setShowReferral(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingVertical: 8 }}>
+                        <View style={{ backgroundColor: theme.inputBg, padding: 6, borderRadius: 8, borderWidth: 1, borderColor: theme.border }}>
+                            <UserPlus size={18} color={theme.primary} />
+                        </View>
+                        <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 14 }}>+ Add Referral</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <Text style={{ color: theme.textDim, fontWeight: '600' }}>Referral / Specialist Consult</Text>
+                            <TouchableOpacity onPress={() => { setShowReferral(false); setEditorForm({...editorForm, referral: ''}); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <Trash2 size={14} color="#ef4444" />
+                                <Text style={{ color: "#ef4444", fontSize: 12, fontWeight: 'bold' }}>Remove</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <View style={[styles.inputContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+                            <UserPlus size={20} color={theme.textDim} />
+                            <TextInput
+                                style={[styles.textInput, { color: theme.text }]}
+                                value={editorForm.referral}
+                                onChangeText={t => setEditorForm({...editorForm, referral: t})}
+                                placeholder="e.g. Refer to Neurologist, Dr. Smith"
+                                placeholderTextColor={theme.textDim}
+                            />
+                        </View>
+                    </View>
+                )}
+            </View>
+
             <InputGroup icon={Clipboard} label="Advice / Notes" value={editorForm.advice} onChange={t => setEditorForm({...editorForm, advice: t})} theme={theme} multiline placeholder="Enter patient advice (e.g., Drink warm water)..." />
             
             {isPrescription && (
@@ -1541,7 +1582,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                         <View style={{ marginBottom: 15 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: theme.border }}>
                                 <Search size={20} color={theme.textDim} style={{ marginRight: 10 }} />
-                                <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} placeholder="Search name..." placeholderTextColor={theme.textDim} value={procSearch} onChangeText={setProcSearch} />
+                                <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} placeholder={procModalType === 'investigation' ? "Search investigation..." : "Search procedure..."} placeholderTextColor={theme.textDim} value={procSearch} onChangeText={setProcSearch} />
                                 {procSearch.length > 0 && <TouchableOpacity onPress={() => setProcSearch('')}><X size={18} color={theme.textDim} /></TouchableOpacity>}
                             </View>
                         </View>
@@ -1560,14 +1601,12 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
                          {/* Custom Input Fields (Visible only if toggled) */}
                          {showCustomInput && (
                              <View style={{backgroundColor: theme.inputBg, padding: 15, borderRadius: 16, marginBottom: 15, gap: 10}}>
-                                 <InputGroup icon={FileText} label="Name" value={customProcForm.name} onChange={t => setCustomProcForm({...customProcForm, name: t})} theme={theme} placeholder="e.g. X-Ray Chest" />
+                                 <InputGroup icon={FileText} label="Name" value={customProcForm.name} onChange={t => setCustomProcForm({...customProcForm, name: t})} theme={theme} placeholder={procModalType === 'investigation' ? "e.g. Thyroid Profile" : "e.g. X-Ray Chest"} />
                                  <View style={{flexDirection:'row', gap: 10, alignItems: 'flex-end'}}>
-                                     {procModalType === 'procedure' && (
-                                         <View style={{flex: 1}}>
-                                             <InputGroup icon={Banknote} label="Price" value={customProcForm.cost} onChange={t => setCustomProcForm({...customProcForm, cost: t})} theme={theme} placeholder="0" keyboardType="numeric" />
-                                         </View>
-                                     )}
-                                     <TouchableOpacity onPress={addCustomToRx} style={{backgroundColor: theme.primary, height: 55, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 4, flex: procModalType === 'investigation' ? 1 : 0}}>
+                                     <View style={{flex: 1}}>
+                                         <InputGroup icon={Banknote} label="Price (Optional)" value={customProcForm.cost} onChange={t => setCustomProcForm({...customProcForm, cost: t})} theme={theme} placeholder="0" keyboardType="numeric" />
+                                     </View>
+                                     <TouchableOpacity onPress={addCustomToRx} style={{backgroundColor: theme.primary, height: 55, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 4}}>
                                          <Text style={{color: 'white', fontWeight: 'bold'}}>Add</Text>
                                      </TouchableOpacity>
                                  </View>
@@ -3547,7 +3586,8 @@ const MainApp = () => {
             diagnosis: prescription.diagnosis,
             medicines: prescription.medicines,
             procedures: prescription.procedures, // NEW: Include procedures
-            advice: prescription.advice
+            advice: prescription.advice,
+            referral: prescription.referral // NEW: Save referral
         };
 
         const updatedPatients = patients.map(p => {
