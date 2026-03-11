@@ -21,7 +21,6 @@ import {
     ArrowLeft,
     Banknote,
     ChevronDown,
-    ChevronRight,
     Clipboard,
     Copy,
     Droplet,
@@ -48,7 +47,8 @@ import {
 } from 'lucide-react-native';
 
 import PrescriptionMedicineModal from '../../components/commons/PrescriptionMedicineModal';
-import { InputGroup } from '../../components/commons/FormControls';
+import { CustomPicker, InputGroup } from '../../components/commons/FormControls';
+import { getMedicalModalTheme, getMedicalTableTheme } from '../../constants/tableTheme';
 import {
     DOSAGES_INIT,
     DURATIONS_INIT,
@@ -57,6 +57,14 @@ import {
     PROCEDURE_CATEGORIES
 } from '../../constants/medical';
 import { buildMedicineRecord, findMatchingMedicine, sanitizeMedicineDraft } from '../../utils/medicine';
+import {
+    buildTemplateRecord,
+    createTemplateCopyName,
+    findMatchingTemplate,
+    hasTemplateContent,
+    mergeTemplateIntoDraft,
+    sanitizeTemplateDraft
+} from '../../utils/template';
 
 const { height } = Dimensions.get('window');
 
@@ -85,6 +93,8 @@ export default function TemplateScreen({
     styles,
 }) {
     const insets = useSafeAreaInsets();
+    const modalTheme = getMedicalModalTheme(theme);
+    const tableTheme = getMedicalTableTheme(theme);
     const [view, setView] = useState('list');
     const [searchQuery, setSearchQuery] = useState('');
     const [editorForm, setEditorForm] = useState({
@@ -112,6 +122,7 @@ export default function TemplateScreen({
     const [customProcForm, setCustomProcForm] = useState({ name: '', cost: '' });
     const [showTemplatePicker, setShowTemplatePicker] = useState(false);
     const [templatePickerSearch, setTemplatePickerSearch] = useState('');
+    const [rowLimitPickerVisible, setRowLimitPickerVisible] = useState(false);
     const [freqOptions, setFreqOptions] = useState(FREQUENCIES_INIT);
     const [durOptions, setDurOptions] = useState(DURATIONS_INIT);
     const [instrOptions, setInstrOptions] = useState(INSTRUCTIONS_INIT);
@@ -132,6 +143,13 @@ export default function TemplateScreen({
         isTapering: false
     });
     const [editingMedIndex, setEditingMedIndex] = useState(null);
+    const [rowLimit, setRowLimit] = useState(25);
+
+    const rowLimitOptions = [
+        { label: '25 rows', value: 25 },
+        { label: '50 rows', value: 50 },
+        { label: '100 rows', value: 100 }
+    ];
 
     const getEmptyPrescriptionMedicineForm = () => ({
         inventoryId: null,
@@ -153,16 +171,23 @@ export default function TemplateScreen({
         }
     }, [isPrescription]);
 
+    const filteredTemplates = templates.filter((template) => {
+        const query = searchQuery.toLowerCase();
+
+        return template.name.toLowerCase().includes(query)
+            || (template.diagnosis || '').toLowerCase().includes(query)
+            || (template.advice || '').toLowerCase().includes(query)
+            || (template.referral || '').toLowerCase().includes(query)
+            || (template.medicines || []).some((item) => item.name.toLowerCase().includes(query));
+    });
+
+    const totalMedicineLines = templates.reduce((count, template) => count + (template.medicines?.length || 0), 0);
+    const totalProcedureLines = templates.reduce((count, template) => count + (template.procedures?.length || 0) + (template.nextVisitInvestigations?.length || 0), 0);
+    const visibleTemplates = filteredTemplates.slice(0, rowLimit);
+    const tableMinWidth = layout?.isTablet ? 1160 : 940;
+
     const applyTemplate = (template) => {
-        setEditorForm((prev) => ({
-            ...prev,
-            diagnosis: template.diagnosis || prev.diagnosis,
-            advice: template.advice || prev.advice,
-            medicines: [...prev.medicines, ...template.medicines],
-            procedures: [...prev.procedures, ...(template.procedures || [])],
-            nextVisitInvestigations: [...prev.nextVisitInvestigations, ...(template.nextVisitInvestigations || [])],
-            referral: template.referral || prev.referral
-        }));
+        setEditorForm((prev) => mergeTemplateIntoDraft(prev, template));
         if (template.referral) {
             setShowReferral(true);
         }
@@ -186,46 +211,112 @@ export default function TemplateScreen({
     const handleCreate = () => {
         setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [], referral: '' });
         setShowReferral(false);
+        setSaveAsTemplate(false);
         setView('edit');
     };
 
+    const handleDuplicateTemplate = (template) => {
+        const copiedTemplate = sanitizeTemplateDraft(template);
+        const copiedName = createTemplateCopyName(templates, copiedTemplate.name);
+
+        setTemplates((prev) => [
+            buildTemplateRecord({ ...copiedTemplate, id: null, name: copiedName }),
+            ...prev
+        ]);
+        showToast('Copied', `${copiedName} created`, 'success');
+    };
+
+    const commitTemplateUpdate = (draft, templateId) => {
+        const sanitizedTemplate = sanitizeTemplateDraft(draft);
+
+        setTemplates((prev) => prev.map((template) => (template.id === templateId ? { ...sanitizedTemplate, id: templateId } : template)));
+    };
+
+    const commitNewTemplate = (draft) => {
+        const record = buildTemplateRecord(draft);
+        setTemplates((prev) => [record, ...prev]);
+        return record;
+    };
+
     const handleSaveTemplate = () => {
-        if (!isPrescription && !editorForm.name) {
+        const sanitizedTemplate = sanitizeTemplateDraft(editorForm);
+
+        if (!isPrescription && !sanitizedTemplate.name) {
             Alert.alert('Required', 'Please enter a Template Name.');
             return;
         }
 
-        if (isPrescription) {
-            if (editorForm.medicines.length === 0 && !editorForm.advice && editorForm.procedures.length === 0 && editorForm.nextVisitInvestigations.length === 0 && !editorForm.referral) {
-                Alert.alert('Empty', 'Please add medicines, procedures, investigations, referral or advice.');
-                return;
-            }
-
-            onSavePrescription({
-                ...editorForm,
-                patientId: patient.id,
-                date: new Date().toISOString()
-            });
-
-            if (saveAsTemplate && editorForm.name) {
-                const newTemplate = { ...editorForm, id: Date.now() };
-                setTemplates([newTemplate, ...templates]);
-                showToast('Saved', 'Prescription & New Template Saved!', 'success');
-            }
+        if (!hasTemplateContent(sanitizedTemplate)) {
+            Alert.alert('Empty Template', 'Add diagnosis, medicines, procedures, investigations, referral, or advice before saving.');
             return;
         }
 
-        let updatedTemplates;
-        if (editorForm.id) {
-            updatedTemplates = templates.map((template) => (template.id === editorForm.id ? editorForm : template));
+        if (isPrescription) {
+            const finalizePrescription = () => {
+                onSavePrescription({
+                    ...sanitizedTemplate,
+                    patientId: patient.id,
+                    date: new Date().toISOString()
+                });
+            };
+
+            if (!saveAsTemplate) {
+                finalizePrescription();
+                return;
+            }
+
+            if (!sanitizedTemplate.name) {
+                Alert.alert('Template Name Required', 'Enter a template name to save this prescription as a reusable template.');
+                return;
+            }
+
+            const existingTemplate = findMatchingTemplate(templates, sanitizedTemplate);
+            if (existingTemplate) {
+                Alert.alert('Template Already Exists', 'Choose whether to overwrite the existing template or save a new copy.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Save Copy',
+                        onPress: () => {
+                            const copiedName = createTemplateCopyName(templates, sanitizedTemplate.name);
+                            commitNewTemplate({ ...sanitizedTemplate, name: copiedName });
+                            showToast('Saved', `Prescription saved and template stored as ${copiedName}.`, 'success');
+                            finalizePrescription();
+                        }
+                    },
+                    {
+                        text: 'Overwrite',
+                        onPress: () => {
+                            commitTemplateUpdate(sanitizedTemplate, existingTemplate.id);
+                            showToast('Updated', `${existingTemplate.name} overwritten with the latest prescription.`, 'success');
+                            finalizePrescription();
+                        }
+                    }
+                ]);
+                return;
+            }
+
+            commitNewTemplate(sanitizedTemplate);
+            showToast('Saved', 'Prescription and template saved.', 'success');
+            finalizePrescription();
+            return;
+        }
+
+        const duplicateTemplate = findMatchingTemplate(templates, sanitizedTemplate, sanitizedTemplate.id || null);
+        if (duplicateTemplate) {
+            Alert.alert('Duplicate Template', 'A template with the same name already exists. Please rename this template or update the existing one.');
+            return;
+        }
+
+        if (sanitizedTemplate.id) {
+            commitTemplateUpdate(sanitizedTemplate, sanitizedTemplate.id);
             showToast('Success', 'Template Updated Successfully!', 'success');
         } else {
-            const newTemplate = { ...editorForm, id: Date.now() };
-            updatedTemplates = [newTemplate, ...templates];
+            commitNewTemplate(sanitizedTemplate);
             showToast('Success', 'New Template Created!', 'success');
         }
 
-        setTemplates(updatedTemplates);
+        setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [], referral: '' });
+        setShowReferral(false);
         setView('list');
     };
 
@@ -236,7 +327,7 @@ export default function TemplateScreen({
                 text: 'Delete',
                 style: 'destructive',
                 onPress: () => {
-                    setTemplates(templates.filter((template) => template.id !== id));
+                    setTemplates((prev) => prev.filter((template) => template.id !== id));
                     showToast('Deleted', 'Template removed.', 'error');
                 }
             }
@@ -519,11 +610,23 @@ export default function TemplateScreen({
     };
 
     const renderList = () => {
-        const filteredTemplates = templates.filter((template) => template.name.toLowerCase().includes(searchQuery.toLowerCase()) || template.diagnosis.toLowerCase().includes(searchQuery.toLowerCase()));
-
         return (
             <View style={{ flex: 1 }}>
-                <View style={getPaddedContentStyle(layout, { marginBottom: 20 })}>
+                <View style={getPaddedContentStyle(layout, { marginBottom: 16, gap: 12 })}>
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                        <View style={{ flex: 1, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                            <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>TOTAL TEMPLATES</Text>
+                            <Text style={{ color: theme.text, fontSize: 24, fontWeight: '800', marginTop: 6 }}>{templates.length}</Text>
+                        </View>
+                        <View style={{ flex: 1, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                            <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>MEDICINE LINES</Text>
+                            <Text style={{ color: theme.text, fontSize: 24, fontWeight: '800', marginTop: 6 }}>{totalMedicineLines}</Text>
+                        </View>
+                        <View style={{ flex: 1, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                            <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>PROC + INVESTIGATIONS</Text>
+                            <Text style={{ color: theme.text, fontSize: 24, fontWeight: '800', marginTop: 6 }}>{totalProcedureLines}</Text>
+                        </View>
+                    </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.cardBg, borderRadius: 16, paddingHorizontal: 15, height: 55, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }}>
                         <Search size={22} color={theme.textDim} style={{ marginRight: 10 }} />
                         <TextInput style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '500' }} placeholder="Search Templates..." placeholderTextColor={theme.textDim} value={searchQuery} onChangeText={setSearchQuery} />
@@ -534,56 +637,102 @@ export default function TemplateScreen({
                         )}
                     </View>
                 </View>
-                <FlatList
-                    data={filteredTemplates}
-                    keyExtractor={(item) => item.id.toString()}
-                    contentContainerStyle={getPaddedContentStyle(layout, { paddingBottom: 100 })}
-                    renderItem={({ item, index }) => (
-                        <TouchableOpacity activeOpacity={0.9} onPress={() => openTemplateDetails(item)} style={{ marginBottom: 20 }}>
-                            <View style={{ backgroundColor: theme.cardBg, borderRadius: 20, shadowColor: theme.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 15, elevation: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-                                <LinearGradient colors={index % 2 === 0 ? ['#2dd4bf', '#0f766e'] : ['#8b5cf6', '#6d28d9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ padding: 15, borderTopLeftRadius: 20, borderTopRightRadius: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                        <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 6, borderRadius: 10 }}>
-                                            <FileText size={18} color="white" />
+                <View style={getPaddedContentStyle(layout, { paddingBottom: 100 })}>
+                    {filteredTemplates.length > 0 ? (
+                        <>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 6 }}>
+                                <LinearGradient colors={tableTheme.shellColors} style={{ minWidth: tableMinWidth, flex: 1, borderRadius: 24, padding: 1.5 }}>
+                                    <View style={{ borderRadius: 23, overflow: 'hidden', borderWidth: 1, borderColor: tableTheme.outline, backgroundColor: tableTheme.statBg }}>
+                                        <LinearGradient colors={tableTheme.headerColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15 }}>
+                                            <Text style={{ width: 230, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Template</Text>
+                                            <Text style={{ width: 220, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Diagnosis</Text>
+                                            <Text style={{ width: 130, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Medicines</Text>
+                                            <Text style={{ width: 170, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Procedures / Inv.</Text>
+                                            <Text style={{ width: 240, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Advice / Referral</Text>
+                                            <Text style={{ flex: 1, minWidth: 240, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Actions</Text>
+                                        </LinearGradient>
+
+                                        <View style={{ overflow: 'hidden' }}>
+                                            {visibleTemplates.map((item, index) => {
+                                                const procedureCount = (item.procedures || []).length;
+                                                const investigationCount = (item.nextVisitInvestigations || []).length;
+                                                const isLastRow = index === visibleTemplates.length - 1;
+
+                                                return (
+                                                    <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: index % 2 === 0 ? tableTheme.rowEven : tableTheme.rowOdd, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: isLastRow ? 0 : 1, borderBottomColor: tableTheme.rowBorder }}>
+                                                        <View style={{ width: 230, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 12 }}>
+                                                            <LinearGradient colors={theme.mode === 'dark' ? ['rgba(45,212,191,0.16)', 'rgba(14,165,233,0.14)'] : ['#ccfbf1', '#dbeafe']} style={{ width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
+                                                                <FileText size={18} color={tableTheme.accentText} />
+                                                            </LinearGradient>
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }} numberOfLines={1}>{item.name}</Text>
+                                                                <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }} numberOfLines={1}>Reusable prescription template</Text>
+                                                            </View>
+                                                        </View>
+
+                                                        <View style={{ width: 220, paddingRight: 12 }}>
+                                                            <Text style={{ fontSize: 14, color: theme.text, fontWeight: '600' }} numberOfLines={2}>{item.diagnosis || 'Not specified'}</Text>
+                                                        </View>
+
+                                                        <View style={{ width: 130, paddingRight: 12 }}>
+                                                            <View style={{ alignSelf: 'flex-start', backgroundColor: tableTheme.viewActionBg, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 }}>
+                                                                <Text style={{ color: tableTheme.viewActionText, fontSize: 12, fontWeight: '700' }}>{item.medicines.length} items</Text>
+                                                            </View>
+                                                        </View>
+
+                                                        <View style={{ width: 170, paddingRight: 12 }}>
+                                                            <Text style={{ fontSize: 13, color: theme.text, fontWeight: '600' }} numberOfLines={2}>{`${procedureCount} procedures • ${investigationCount} investigations`}</Text>
+                                                        </View>
+
+                                                        <View style={{ width: 240, paddingRight: 12 }}>
+                                                            <Text style={{ fontSize: 13, color: theme.textDim, fontWeight: '500' }} numberOfLines={2}>{item.referral || item.advice || 'No advice added'}</Text>
+                                                        </View>
+
+                                                        <View style={{ flex: 1, minWidth: 240, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+                                                            <TouchableOpacity onPress={() => openTemplateDetails(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tableTheme.viewActionBg, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 }}>
+                                                                <Eye size={16} color={tableTheme.viewActionText} />
+                                                                <Text style={{ color: tableTheme.viewActionText, fontSize: 12, fontWeight: '700' }}>View</Text>
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity onPress={() => handleDuplicateTemplate(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.mode === 'dark' ? 'rgba(132,204,22,0.16)' : '#ecfccb', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 }}>
+                                                                <Copy size={16} color="#4d7c0f" />
+                                                                <Text style={{ color: '#4d7c0f', fontSize: 12, fontWeight: '700' }}>Copy</Text>
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity onPress={() => handleEdit(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tableTheme.editActionBg, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 }}>
+                                                                <Pencil size={16} color={tableTheme.editActionText} />
+                                                                <Text style={{ color: tableTheme.editActionText, fontSize: 12, fontWeight: '700' }}>Edit</Text>
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity onPress={() => handleDeleteTemplate(item.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tableTheme.deleteActionBg, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 }}>
+                                                                <Trash2 size={16} color={tableTheme.deleteActionText} />
+                                                                <Text style={{ color: tableTheme.deleteActionText, fontSize: 12, fontWeight: '700' }}>Delete</Text>
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    </View>
+                                                );
+                                            })}
                                         </View>
-                                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>{item.name}</Text>
                                     </View>
                                 </LinearGradient>
-                                <View style={{ padding: 15 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                                        <Stethoscope size={16} color={theme.primary} />
-                                        <Text style={{ fontSize: 14, color: theme.text, fontWeight: '600' }}>{item.diagnosis}</Text>
-                                    </View>
-                                    <View style={{ gap: 8 }}>
-                                        {item.medicines.slice(0, 2).map((medicine, medicineIndex) => (
-                                            <View key={medicineIndex} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: theme.inputBg, padding: 8, borderRadius: 8 }}>
-                                                <Pencil size={14} color={theme.textDim} />
-                                                <Text style={{ color: theme.textDim, fontSize: 12, flex: 1, fontWeight: '500' }}>
-                                                    {medicine.name} <Text style={{ fontSize: 10 }}>({medicine.dosage})</Text>
-                                                </Text>
-                                            </View>
-                                        ))}
-                                        {item.medicines.length > 2 && <Text style={{ fontSize: 12, color: theme.primary, fontWeight: 'bold', marginLeft: 5 }}>+ {item.medicines.length - 2} more medicines</Text>}
-                                    </View>
-                                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderColor: theme.border }}>
-                                        <TouchableOpacity onPress={() => openTemplateDetails(item)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e0f2fe', padding: 10, borderRadius: 10, gap: 5 }}>
-                                            <Eye size={16} color="#0284c7" />
-                                            <Text style={{ color: '#0284c7', fontWeight: 'bold', fontSize: 13 }}>View</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => handleEdit(item)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffedd5', padding: 10, borderRadius: 10, gap: 5 }}>
-                                            <Pencil size={16} color="#ea580c" />
-                                            <Text style={{ color: '#ea580c', fontWeight: 'bold', fontSize: 13 }}>Edit</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => handleDeleteTemplate(item.id)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fee2e2', padding: 10, borderRadius: 10 }}>
-                                            <Trash2 size={16} color="#dc2626" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
+                            </ScrollView>
+
+                            <View style={{ marginTop: 8, marginBottom: 32, paddingHorizontal: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Text style={{ color: theme.textDim, fontSize: 12 }}>
+                                    {filteredTemplates.length === templates.length
+                                        ? `Showing ${visibleTemplates.length} of ${templates.length} templates`
+                                        : `Showing ${visibleTemplates.length} of ${filteredTemplates.length} filtered templates`}
+                                </Text>
+                                <TouchableOpacity onPress={() => setRowLimitPickerVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Text style={{ color: tableTheme.footerHint, fontSize: 12, fontWeight: '700' }}>{`Rows: ${rowLimit}`}</Text>
+                                    <ChevronDown size={14} color={tableTheme.footerHint} />
+                                </TouchableOpacity>
                             </View>
-                        </TouchableOpacity>
+                        </>
+                    ) : (
+                        <View style={{ alignItems: 'center', marginTop: 50, opacity: 0.6 }}>
+                            <Sparkles size={60} color={theme.textDim} />
+                            <Text style={{ color: theme.textDim, marginTop: 15, fontSize: 16 }}>Create your first prescription template</Text>
+                        </View>
                     )}
-                    ListEmptyComponent={<View style={{ alignItems: 'center', marginTop: 50, opacity: 0.6 }}><Sparkles size={60} color={theme.textDim} /><Text style={{ color: theme.textDim, marginTop: 15, fontSize: 16 }}>Create your first prescription template</Text></View>}
-                />
+                </View>
             </View>
         );
     };
@@ -643,10 +792,21 @@ export default function TemplateScreen({
                     <View style={{ height: 1, backgroundColor: theme.border, marginBottom: 15 }} />
                     {renderVitalsSummary()}
 
-                    <TouchableOpacity onPress={() => setShowTemplatePicker(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.inputBg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.primary, marginBottom: 20 }}>
-                        <Copy size={18} color={theme.primary} />
-                        <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Load from Template</Text>
-                    </TouchableOpacity>
+                    <View style={{ marginBottom: 20, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <View>
+                                <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800' }}>Template Library</Text>
+                                <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 3 }}>Load a saved prescription structure into this visit</Text>
+                            </View>
+                            <View style={{ backgroundColor: theme.inputBg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 }}>
+                                <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>{templates.length} saved</Text>
+                            </View>
+                        </View>
+                        <TouchableOpacity onPress={() => setShowTemplatePicker(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.inputBg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.primary, marginTop: 8 }}>
+                            <Copy size={18} color={theme.primary} />
+                            <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Use Template in Prescription</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             )}
 
@@ -981,11 +1141,13 @@ export default function TemplateScreen({
         return (
             <Modal visible={procModalVisible} animationType="slide" transparent onRequestClose={() => setProcModalVisible(false)}>
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+                    <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
                         <TouchableOpacity style={{ flex: 1 }} onPress={() => setProcModalVisible(false)} />
-                        <View style={{ backgroundColor: theme.cardBg, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, height: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.3, elevation: 20 }}>
+                        <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
+                        <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 31, borderTopRightRadius: 31, padding: 25, height: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.3, elevation: 20, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
                             {renderModalContent()}
                         </View>
+                        </LinearGradient>
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
@@ -999,15 +1161,16 @@ export default function TemplateScreen({
 
         return (
             <Modal visible={viewModalVisible} transparent animationType="fade" onRequestClose={() => setViewModalVisible(false)}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', padding: 20 }}>
                     <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setViewModalVisible(false)} />
-                    <View style={{ backgroundColor: theme.cardBg, borderRadius: 24, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.3, elevation: 10, maxHeight: '80%' }}>
-                        <LinearGradient colors={[theme.primary, theme.primaryDark]} style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <LinearGradient colors={modalTheme.shellColors} style={{ borderRadius: 26, padding: 1.5 }}>
+                    <View style={{ backgroundColor: modalTheme.surface, borderRadius: 25, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.3, elevation: 10, maxHeight: '80%', borderWidth: 1, borderColor: modalTheme.shellBorder }}>
+                        <LinearGradient colors={modalTheme.headerColors} style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                 <FileText size={24} color="white" />
                                 <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold' }}>Template Details</Text>
                             </View>
-                            <TouchableOpacity onPress={() => setViewModalVisible(false)} style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 5, borderRadius: 15 }}>
+                            <TouchableOpacity onPress={() => setViewModalVisible(false)} style={{ backgroundColor: modalTheme.closeBg, padding: 5, borderRadius: 15 }}>
                                 <X size={20} color="white" />
                             </TouchableOpacity>
                         </LinearGradient>
@@ -1018,50 +1181,117 @@ export default function TemplateScreen({
                                 <Text style={{ fontSize: 14, color: theme.textDim, fontWeight: '600' }}>Diagnosis: {selectedTemplate.diagnosis}</Text>
                             </View>
                             <Text style={{ fontSize: 14, color: theme.textDim, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 10 }}>Medicines List</Text>
-                            <View style={{ gap: 10, marginBottom: 20 }}>
-                                {selectedTemplate.medicines.map((medicine, index) => (
-                                    <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, backgroundColor: theme.inputBg, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: theme.primary }}>
-                                        <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.cardBg, alignItems: 'center', justifyContent: 'center' }}>
-                                            <Pill size={16} color={theme.primary} />
+                            {selectedTemplate.medicines.length > 0 && (
+                                <View style={{ gap: 10, marginBottom: 20 }}>
+                                    {selectedTemplate.medicines.map((medicine, index) => (
+                                        <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, backgroundColor: modalTheme.infoBg, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: theme.primary, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
+                                            <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: modalTheme.surface, alignItems: 'center', justifyContent: 'center' }}>
+                                                <Pill size={16} color={theme.primary} />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ fontWeight: 'bold', color: theme.text, fontSize: 15 }}>{medicine.name} <Text style={{ fontSize: 12, color: theme.textDim }}>({medicine.dosage})</Text></Text>
+                                                {medicine.isTapering ? (
+                                                    <Text style={{ fontSize: 12, color: '#c2410c', marginTop: 2, fontStyle: 'italic' }}>Tapering: {medicine.freq} for {medicine.duration}</Text>
+                                                ) : (
+                                                    <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{medicine.freq} • {medicine.duration} • {medicine.instruction}</Text>
+                                                )}
+                                            </View>
                                         </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{ fontWeight: 'bold', color: theme.text, fontSize: 15 }}>{medicine.name} <Text style={{ fontSize: 12, color: theme.textDim }}>({medicine.dosage})</Text></Text>
-                                            {medicine.isTapering ? (
-                                                <Text style={{ fontSize: 12, color: '#c2410c', marginTop: 2, fontStyle: 'italic' }}>Tapering: {medicine.freq} for {medicine.duration}</Text>
-                                            ) : (
-                                                <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{medicine.freq} • {medicine.duration} • {medicine.instruction}</Text>
-                                            )}
-                                        </View>
+                                    ))}
+                                </View>
+                            )}
+                            {(selectedTemplate.procedures || []).length > 0 && (
+                                <View style={{ marginBottom: 20 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                                        <Settings size={14} color={theme.textDim} />
+                                        <Text style={{ fontSize: 13, color: theme.textDim, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Procedures / Services</Text>
                                     </View>
-                                ))}
-                            </View>
-                            <View style={{ backgroundColor: '#fff7ed', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#ffedd5' }}>
+                                    <View style={{ gap: 8 }}>
+                                        {selectedTemplate.procedures.map((proc, index) => (
+                                            <View key={index} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, backgroundColor: modalTheme.infoBg, borderRadius: 12, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
+                                                <Text style={{ fontWeight: '600', color: theme.text, fontSize: 14 }}>{proc.name}</Text>
+                                                <Text style={{ fontWeight: '700', color: theme.primary, fontSize: 14 }}>₹{proc.cost}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+                            {(selectedTemplate.nextVisitInvestigations || []).length > 0 && (
+                                <View style={{ marginBottom: 20 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                                        <TestTube size={14} color={theme.textDim} />
+                                        <Text style={{ fontSize: 13, color: theme.textDim, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Next Visit Investigations</Text>
+                                    </View>
+                                    <View style={{ gap: 8 }}>
+                                        {selectedTemplate.nextVisitInvestigations.map((inv, index) => (
+                                            <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: modalTheme.infoBg, borderRadius: 12, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
+                                                <TestTube size={14} color="#0284c7" />
+                                                <Text style={{ fontWeight: '600', color: theme.text, fontSize: 14 }}>{inv.name}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+                            {!!selectedTemplate.referral && (
+                                <View style={{ marginBottom: 20, backgroundColor: theme.mode === 'dark' ? 'rgba(139,92,246,0.15)' : '#f5f3ff', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(139,92,246,0.3)' : '#ddd6fe' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                                        <UserPlus size={14} color="#7c3aed" />
+                                        <Text style={{ fontWeight: '800', color: '#7c3aed', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Referral</Text>
+                                    </View>
+                                    <Text style={{ color: theme.text, fontWeight: '600' }}>{selectedTemplate.referral}</Text>
+                                </View>
+                            )}
+                            <View style={{ backgroundColor: '#fff7ed', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#fed7aa' }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                                     <Clipboard size={16} color="#c2410c" />
                                     <Text style={{ fontWeight: 'bold', color: '#c2410c' }}>Advice / Notes</Text>
                                 </View>
                                 <Text style={{ color: '#9a3412', fontStyle: 'italic' }}>{selectedTemplate.advice || 'No specific advice.'}</Text>
                             </View>
+                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+                                <TouchableOpacity onPress={() => { setViewModalVisible(false); handleDuplicateTemplate(selectedTemplate); }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ecfccb', padding: 12, borderRadius: 12, gap: 6 }}>
+                                    <Copy size={16} color="#4d7c0f" />
+                                    <Text style={{ color: '#4d7c0f', fontWeight: '800' }}>Copy</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => { setViewModalVisible(false); handleEdit(selectedTemplate); }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffedd5', padding: 12, borderRadius: 12, gap: 6 }}>
+                                    <Pencil size={16} color="#ea580c" />
+                                    <Text style={{ color: '#ea580c', fontWeight: '800' }}>Edit</Text>
+                                </TouchableOpacity>
+                            </View>
                         </ScrollView>
                     </View>
+                    </LinearGradient>
                 </View>
             </Modal>
         );
     };
 
-    const TemplatePickerModal = () => (
+    const TemplatePickerModal = () => {
+        const pickerFilteredTemplates = templates.filter((template) => {
+            const query = templatePickerSearch.toLowerCase();
+
+            return template.name.toLowerCase().includes(query)
+                || (template.diagnosis || '').toLowerCase().includes(query)
+                || (template.medicines || []).some((medicine) => medicine.name.toLowerCase().includes(query));
+        });
+
+        return (
         <Modal visible={showTemplatePicker} transparent animationType="slide" onRequestClose={() => setShowTemplatePicker(false)}>
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-                <View style={{ backgroundColor: theme.cardBg, borderTopLeftRadius: 25, borderTopRightRadius: 25, maxHeight: height * 0.7, paddingBottom: 30 }}>
-                    <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: theme.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>Select a Template</Text>
-                        <TouchableOpacity onPress={() => setShowTemplatePicker(false)}>
-                            <X size={24} color={theme.textDim} />
+            <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
+                <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
+                <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 27, borderTopRightRadius: 27, maxHeight: height * 0.78, paddingBottom: 30, borderWidth: 1, borderColor: modalTheme.shellBorder, overflow: 'hidden' }}>
+                    <LinearGradient colors={modalTheme.headerColors} style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View>
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: modalTheme.eyebrowText, letterSpacing: 0.7 }}>TEMPLATE LIBRARY</Text>
+                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: modalTheme.headerText, marginTop: 4 }}>Select a Template</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => setShowTemplatePicker(false)} style={{ backgroundColor: modalTheme.closeBg, padding: 8, borderRadius: 20 }}>
+                            <X size={22} color={modalTheme.closeIcon} />
                         </TouchableOpacity>
-                    </View>
+                    </LinearGradient>
 
                     <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingHorizontal: 10, height: 45, borderWidth: 1, borderColor: theme.border }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: modalTheme.infoBg, borderRadius: 12, paddingHorizontal: 10, height: 45, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                             <Search size={18} color={theme.textDim} style={{ marginRight: 8 }} />
                             <TextInput style={{ flex: 1, color: theme.text }} placeholder="Search templates..." placeholderTextColor={theme.textDim} value={templatePickerSearch} onChangeText={setTemplatePickerSearch} />
                             {templatePickerSearch.length > 0 && (
@@ -1072,30 +1302,64 @@ export default function TemplateScreen({
                         </View>
                     </View>
 
-                    <FlatList
-                        data={templates.filter((template) => template.name.toLowerCase().includes(templatePickerSearch.toLowerCase()))}
-                        keyExtractor={(item) => item.id.toString()}
-                        contentContainerStyle={{ padding: 20 }}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity onPress={() => applyTemplate(item)} style={{ paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
-                                    <View style={{ backgroundColor: theme.inputBg, width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
-                                        <FileText size={20} color={theme.primary} />
-                                    </View>
-                                    <View>
-                                        <Text style={{ fontSize: 16, color: theme.text, fontWeight: 'bold' }}>{item.name}</Text>
-                                        <Text style={{ fontSize: 12, color: theme.textDim }}>{item.medicines.length} Medicines • {item.diagnosis}</Text>
-                                    </View>
+                    <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
+                        <View style={{ backgroundColor: modalTheme.infoBg, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: modalTheme.infoBorder, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>Templates ready to use</Text>
+                            <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '800' }}>{pickerFilteredTemplates.length} found</Text>
+                        </View>
+                    </View>
+
+                    {pickerFilteredTemplates.length > 0 ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 10 }}>
+                            <LinearGradient colors={tableTheme.shellColors} style={{ minWidth: tableMinWidth - 80, flex: 1, borderRadius: 22, padding: 1.5 }}>
+                                <View style={{ borderRadius: 21, overflow: 'hidden', borderWidth: 1, borderColor: tableTheme.outline, backgroundColor: tableTheme.statBg }}>
+                                    <LinearGradient colors={tableTheme.headerColors} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }}>
+                                        <Text style={{ width: 220, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Template</Text>
+                                        <Text style={{ width: 230, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Diagnosis</Text>
+                                        <Text style={{ width: 150, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Items</Text>
+                                        <Text style={{ flex: 1, minWidth: 170, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Action</Text>
+                                    </LinearGradient>
+
+                                    {pickerFilteredTemplates.map((item, index) => {
+                                        const isLastRow = index === pickerFilteredTemplates.length - 1;
+                                        const summary = [
+                                            `${item.medicines.length} med`,
+                                            `${(item.procedures || []).length} proc`,
+                                            `${(item.nextVisitInvestigations || []).length} inv`
+                                        ].join(' • ');
+
+                                        return (
+                                            <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: index % 2 === 0 ? tableTheme.rowEven : tableTheme.rowOdd, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: isLastRow ? 0 : 1, borderBottomColor: tableTheme.rowBorder }}>
+                                                <View style={{ width: 220, paddingRight: 12 }}>
+                                                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }} numberOfLines={1}>{item.name}</Text>
+                                                </View>
+                                                <View style={{ width: 230, paddingRight: 12 }}>
+                                                    <Text style={{ fontSize: 13, color: theme.textDim, fontWeight: '600' }} numberOfLines={2}>{item.diagnosis || 'Not specified'}</Text>
+                                                </View>
+                                                <View style={{ width: 150, paddingRight: 12 }}>
+                                                    <Text style={{ fontSize: 13, color: theme.text, fontWeight: '600' }} numberOfLines={2}>{summary}</Text>
+                                                </View>
+                                                <View style={{ flex: 1, minWidth: 170, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+                                                    <TouchableOpacity onPress={() => applyTemplate(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tableTheme.editActionBg, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 }}>
+                                                        <Copy size={16} color={tableTheme.editActionText} />
+                                                        <Text style={{ color: tableTheme.editActionText, fontSize: 12, fontWeight: '700' }}>Use</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
                                 </View>
-                                <ChevronRight size={16} color={theme.textDim} />
-                            </TouchableOpacity>
-                        )}
-                        ListEmptyComponent={<Text style={{ textAlign: 'center', padding: 20, color: theme.textDim }}>No templates available.</Text>}
-                    />
+                            </LinearGradient>
+                        </ScrollView>
+                    ) : (
+                        <Text style={{ textAlign: 'center', padding: 20, color: theme.textDim }}>No templates available.</Text>
+                    )}
                 </View>
+                </LinearGradient>
             </View>
         </Modal>
-    );
+        );
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -1155,23 +1419,28 @@ export default function TemplateScreen({
             {renderProcedureModal()}
             {TemplateDetailPopup()}
             {TemplatePickerModal()}
+            <CustomPicker visible={rowLimitPickerVisible} title="Rows to show" data={rowLimitOptions} onClose={() => setRowLimitPickerVisible(false)} onSelect={(value) => setRowLimit(Number(value))} theme={theme} />
 
             <Modal visible={inputVisible} transparent animationType="fade">
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <View style={{ width: '100%', maxWidth: 300, backgroundColor: theme.cardBg, borderRadius: 20, padding: 20 }}>
+                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                    <LinearGradient colors={modalTheme.shellColors} style={{ width: '100%', maxWidth: 300, borderRadius: 22, padding: 1.5 }}>
+                    <View style={{ width: '100%', backgroundColor: modalTheme.surface, borderRadius: 21, padding: 20, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
                         <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 15 }}>{editingItem ? 'Edit Item' : 'Add New Item'}</Text>
-                        <View style={[styles.inputContainer, { backgroundColor: theme.inputBg, borderColor: theme.primary }]}>
+                        <View style={[styles.inputContainer, { backgroundColor: modalTheme.infoBg, borderColor: theme.primary }]}>
                             <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} value={inputText} onChangeText={setInputText} autoFocus placeholder="Type custom value..." placeholderTextColor={theme.textDim} />
                         </View>
                         <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-                            <TouchableOpacity onPress={() => setInputVisible(false)} style={{ flex: 1, padding: 12, alignItems: 'center', borderRadius: 10, backgroundColor: theme.inputBg }}>
-                                <Text style={{ color: theme.textDim, fontWeight: 'bold' }}>Cancel</Text>
+                            <TouchableOpacity onPress={() => setInputVisible(false)} style={{ flex: 1, padding: 12, alignItems: 'center', borderRadius: 10, backgroundColor: modalTheme.cancelBg }}>
+                                <Text style={{ color: modalTheme.cancelText, fontWeight: 'bold' }}>Cancel</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={handleAddItem} style={{ flex: 1, padding: 12, alignItems: 'center', borderRadius: 10, backgroundColor: theme.primary }}>
-                                <Text style={{ color: 'white', fontWeight: 'bold' }}>{editingItem ? 'Update' : 'Add'}</Text>
+                            <TouchableOpacity onPress={handleAddItem} style={{ flex: 1 }}>
+                                <LinearGradient colors={modalTheme.primaryButton} style={{ padding: 12, alignItems: 'center', borderRadius: 10 }}>
+                                    <Text style={{ color: 'white', fontWeight: 'bold' }}>{editingItem ? 'Update' : 'Add'}</Text>
+                                </LinearGradient>
                             </TouchableOpacity>
                         </View>
                     </View>
+                    </LinearGradient>
                 </View>
             </Modal>
         </View>

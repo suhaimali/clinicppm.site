@@ -4,13 +4,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Activity, Archive, ArrowLeft, ChevronDown, Eye, Filter, Layers, LayoutGrid, Package, Pencil, Pill, Plus, Search, Tag, Trash2, X } from 'lucide-react-native';
 import { MEDICINE_CATEGORIES } from '../../constants/medical';
-import { getMedicalTableTheme } from '../../constants/tableTheme';
+import { getMedicalModalTheme, getMedicalTableTheme } from '../../constants/tableTheme';
 import { CustomPicker, InputGroup } from '../../components/commons/FormControls';
 import { buildMedicineRecord, findMatchingMedicine, sanitizeMedicineDraft } from '../../utils/medicine';
 
 export default function MedicineScreen({ theme, onBack, medicines, setMedicines, showToast, styles, layout }) {
     const insets = useSafeAreaInsets();
     const tableTheme = getMedicalTableTheme(theme);
+    const modalTheme = getMedicalModalTheme(theme);
     const defaultFormData = { name: '', type: 'Tablet', content: '' };
     const rowLimitOptions = [
         { label: '25 rows', value: 25 },
@@ -158,11 +159,13 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
 
         return (
             <Modal visible={detailVisible} transparent animationType="none" onRequestClose={() => setDetailVisible(false)}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
                     <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setDetailVisible(false)} />
-                    <Animated.View style={{ width: '100%', maxWidth: 340, backgroundColor: theme.cardBg, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10, overflow: 'hidden', transform: [{ scale: scaleAnim }] }}>
-                        <View style={{ backgroundColor: catDetails.color, padding: 20, alignItems: 'center', position: 'relative' }}>
-                            <TouchableOpacity onPress={() => setDetailVisible(false)} style={{ position: 'absolute', top: 15, right: 15, padding: 5, backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 20 }}>
+                    <Animated.View style={{ width: '100%', maxWidth: 340, borderRadius: 26, overflow: 'hidden', transform: [{ scale: scaleAnim }] }}>
+                        <LinearGradient colors={modalTheme.shellColors} style={{ borderRadius: 26, padding: 1.5 }}>
+                        <View style={{ backgroundColor: modalTheme.surface, borderRadius: 25, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10, overflow: 'hidden', borderWidth: 1, borderColor: modalTheme.shellBorder }}>
+                        <LinearGradient colors={[catDetails.color, '#0ea5e9']} style={{ padding: 20, alignItems: 'center', position: 'relative' }}>
+                            <TouchableOpacity onPress={() => setDetailVisible(false)} style={{ position: 'absolute', top: 15, right: 15, padding: 5, backgroundColor: modalTheme.closeBg, borderRadius: 20 }}>
                                 <X size={20} color="white" />
                             </TouchableOpacity>
                             <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
@@ -172,13 +175,13 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
                             <View style={{ marginTop: 10, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
                                 <Text style={{ color: 'white', fontSize: 12, fontWeight: '700', letterSpacing: 0.3 }}>{selectedMed.type} PROFILE</Text>
                             </View>
-                        </View>
+                        </LinearGradient>
                         <View style={{ padding: 25, gap: 20 }}>
-                            <View style={{ backgroundColor: catDetails.bg, borderRadius: 18, padding: 16 }}>
+                            <View style={{ backgroundColor: catDetails.bg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                                 <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', marginBottom: 5 }}>Medicine Name</Text>
                                 <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>{selectedMed.name}</Text>
                             </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 18, borderWidth: 1, borderColor: theme.border, padding: 16, backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 18, borderWidth: 1, borderColor: modalTheme.sectionBorder, padding: 16, backgroundColor: modalTheme.sectionBg }}>
                                 <View>
                                     <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', marginBottom: 5 }}>Dosage Form</Text>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -190,11 +193,13 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
                                     <Text style={{ color: catDetails.color, fontSize: 12, fontWeight: '700' }}>Active</Text>
                                 </View>
                             </View>
-                            <View style={{ borderRadius: 18, padding: 16, backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderWidth: 1, borderColor: theme.border }}>
+                            <View style={{ borderRadius: 18, padding: 16, backgroundColor: modalTheme.sectionBg, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                 <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', marginBottom: 5 }}>Content / Strength</Text>
                                 <Text style={{ fontSize: 16, color: theme.text }}>{selectedMed.content}</Text>
                             </View>
                         </View>
+                        </View>
+                        </LinearGradient>
                     </Animated.View>
                 </View>
             </Modal>
@@ -210,21 +215,22 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
         return (
             <Modal visible={addEditVisible} transparent animationType="slide" onRequestClose={closeAddEditModal} statusBarTranslucent>
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+                    <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
                         <TouchableOpacity style={{ flex: 1 }} onPress={closeAddEditModal} />
-                        <View style={{ backgroundColor: theme.cardBg, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, paddingBottom: 32, maxHeight: '88%', shadowColor: '#000', shadowOpacity: 0.3, elevation: 20, borderTopWidth: 4, borderTopColor: catDetails.color }}>
+                        <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
+                        <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 31, borderTopRightRadius: 31, padding: 25, paddingBottom: 32, maxHeight: '88%', shadowColor: '#000', shadowOpacity: 0.3, elevation: 20, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
                                 <View>
                                     <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{isEditing ? 'Edit Medicine' : 'Add New Medicine'}</Text>
                                     <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>Build a clean, colorful medication record</Text>
                                 </View>
-                                <TouchableOpacity onPress={closeAddEditModal} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}>
+                                <TouchableOpacity onPress={closeAddEditModal} style={{ backgroundColor: modalTheme.cancelBg, padding: 8, borderRadius: 20 }}>
                                     <X size={20} color={theme.textDim} />
                                 </TouchableOpacity>
                             </View>
                             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                                 <View style={{ gap: 15 }}>
-                                    <View style={{ backgroundColor: catDetails.bg, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }}>
+                                    <View style={{ backgroundColor: catDetails.bg, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                                                 <View style={{ width: 52, height: 52, borderRadius: 18, backgroundColor: catDetails.color, alignItems: 'center', justifyContent: 'center' }}>
@@ -235,17 +241,17 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
                                                     <Text style={{ fontSize: 17, color: theme.text, fontWeight: '700', marginTop: 4 }}>{formData.name || 'New medicine entry'}</Text>
                                                 </View>
                                             </View>
-                                            <View style={{ backgroundColor: theme.cardBg, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 }}>
+                                            <View style={{ backgroundColor: modalTheme.surface, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 }}>
                                                 <Text style={{ color: catDetails.color, fontSize: 12, fontWeight: '700' }}>{formData.type}</Text>
                                             </View>
                                         </View>
                                         <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 12 }}>{formData.content || 'Add the strength or content to complete the prescription-ready medicine profile.'}</Text>
                                     </View>
 
-                                    <View style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                                    <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                         <InputGroup icon={Pill} label="Medicine Name *" value={formData.name} onChange={(value) => setFormData((prev) => ({ ...prev, name: value }))} theme={theme} placeholder="Enter medicine name" styles={styles} />
                                     </View>
-                                    <View style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                                    <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                         <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Dosage Form *</Text>
                                         <TouchableOpacity onPress={() => setCategoryPickerVisible(true)} style={[styles.inputContainer, { backgroundColor: catDetails.bg, borderColor: catDetails.color, justifyContent: 'space-between', paddingRight: 15 }]}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -255,21 +261,24 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
                                             <ChevronDown size={16} color={catDetails.color} />
                                         </TouchableOpacity>
                                     </View>
-                                    <View style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                                    <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                         <InputGroup icon={Activity} label="Content/Strength" value={formData.content} onChange={(value) => setFormData((prev) => ({ ...prev, content: value }))} theme={theme} placeholder="e.g. 500mg" styles={styles} />
                                     </View>
                                 </View>
                             </ScrollView>
 
                             <View style={{ flexDirection: 'row', gap: 10, marginTop: 24 }}>
-                                <TouchableOpacity onPress={closeAddEditModal} style={{ flex: 1, padding: 16, borderRadius: 16, alignItems: 'center', backgroundColor: theme.inputBg, borderWidth: 1, borderColor: theme.border }}>
-                                    <Text style={{ color: theme.textDim, fontWeight: 'bold' }}>Cancel</Text>
+                                <TouchableOpacity onPress={closeAddEditModal} style={{ flex: 1, padding: 16, borderRadius: 16, alignItems: 'center', backgroundColor: modalTheme.cancelBg, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
+                                    <Text style={{ color: modalTheme.cancelText, fontWeight: 'bold' }}>Cancel</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={handleSave} style={{ flex: 1, padding: 16, borderRadius: 16, alignItems: 'center', backgroundColor: theme.primary, shadowColor: theme.primary, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 }}>
-                                    <Text style={{ color: 'white', fontWeight: 'bold' }}>{isEditing ? 'Save Changes' : 'Add Medicine'}</Text>
+                                <TouchableOpacity onPress={handleSave} style={{ flex: 1 }}>
+                                    <LinearGradient colors={modalTheme.primaryButton} style={{ padding: 16, borderRadius: 16, alignItems: 'center', shadowColor: theme.primary, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 }}>
+                                        <Text style={{ color: 'white', fontWeight: 'bold' }}>{isEditing ? 'Save Changes' : 'Add Medicine'}</Text>
+                                    </LinearGradient>
                                 </TouchableOpacity>
                             </View>
                         </View>
+                        </LinearGradient>
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
@@ -402,7 +411,7 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
                                 </View>
                             </LinearGradient>
                         </ScrollView>
-                        <View style={{ marginTop: 8, paddingHorizontal: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ marginTop: 8, paddingHorizontal: 9, paddingBottom: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={{ color: theme.textDim, fontSize: 12 }}>
                                 {filteredMedicines.length === medicines.length
                                     ? `Showing ${visibleMedicines.length} of ${medicines.length} items`

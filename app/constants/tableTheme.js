@@ -21,3 +21,29 @@ export const getMedicalTableTheme = (theme) => ({
     deleteActionText: '#dc2626',
     footerHint: theme.mode === 'dark' ? '#99f6e4' : '#0f766e'
 });
+
+export const getMedicalModalTheme = (theme) => ({
+    overlay: theme.mode === 'dark' ? 'rgba(2,6,23,0.82)' : 'rgba(15,23,42,0.42)',
+    shellColors: theme.mode === 'dark'
+        ? ['rgba(20,184,166,0.28)', 'rgba(15,23,42,0.98)']
+        : ['#ecfeff', '#f8fafc'],
+    shellBorder: theme.mode === 'dark' ? 'rgba(45,212,191,0.28)' : '#99f6e4',
+    surface: theme.mode === 'dark' ? '#0f172a' : '#ffffff',
+    sectionBg: theme.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f8fafc',
+    sectionBorder: theme.mode === 'dark' ? 'rgba(148,163,184,0.16)' : '#dbeafe',
+    headerColors: theme.mode === 'dark' ? ['#14b8a6', '#0ea5e9'] : ['#14b8a6', '#0284c7'],
+    headerText: '#f0fdfa',
+    eyebrowText: theme.mode === 'dark' ? '#ccfbf1' : 'rgba(255,255,255,0.88)',
+    iconBg: 'rgba(255,255,255,0.18)',
+    closeBg: 'rgba(255,255,255,0.18)',
+    closeIcon: '#ffffff',
+    chipBg: theme.mode === 'dark' ? 'rgba(45,212,191,0.16)' : '#ccfbf1',
+    chipText: theme.mode === 'dark' ? '#99f6e4' : '#0f766e',
+    subtleText: theme.mode === 'dark' ? '#94a3b8' : '#475569',
+    titleText: theme.text,
+    cancelBg: theme.mode === 'dark' ? 'rgba(148,163,184,0.16)' : '#e2e8f0',
+    cancelText: theme.mode === 'dark' ? '#e2e8f0' : '#334155',
+    primaryButton: [theme.primary, theme.primaryDark],
+    infoBg: theme.mode === 'dark' ? 'rgba(45,212,191,0.12)' : '#f0fdfa',
+    infoBorder: theme.mode === 'dark' ? 'rgba(45,212,191,0.2)' : '#99f6e4'
+});

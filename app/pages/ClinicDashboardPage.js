@@ -42,6 +42,7 @@ import PatientScreenPage from './screens/PatientScreen';
 import PlaceholderPage from './screens/PlaceholderScreen';
 import ProceduresPage from './screens/ProceduresScreen';
 import SupportPage from './screens/SupportScreen';
+import TemplateScreenPage from './screens/TemplateScreen';
 import VitalsScreenPage from './screens/VitalsScreen';
 
 import {
@@ -143,6 +144,9 @@ const INITIAL_PATIENTS = [
     { id: 101, name: "Sarah Jenkins", mobile: "9876543210", email: "sarah.j@example.com", age: "28", dob: "1996-01-10", gender: "F", blood: "A+", address: "New York, NY", registeredDate: "Jan 10, 2024", vitalsHistory: [ { id: 1, date: new Date().toISOString(), sys: '120', dia: '80', pulse: '72', weight: '65', temp: '36.6', tempUnit: 'C' } ], rxHistory: [] },
     { id: 102, name: "Mike Ross", mobile: "9988776655", email: "mike.ross@law.com", age: "35", dob: "1989-02-01", gender: "M", blood: "O-", address: "Brooklyn, NY", registeredDate: "Feb 01, 2024", vitalsHistory: [], rxHistory: [] },
     { id: 822, name: "Suhaim", mobile: "8891479505", email: "suhaim@example.com", age: "18", dob: "2006-05-15", gender: "M", blood: "O+", address: "Pathappiriyam", registeredDate: "Feb 19, 2026", vitalsHistory: [], rxHistory: [] },
+    { id: 103, name: "Harvey Specter", mobile: "9123456789", email: "harvey@specter.com", age: "40", dob: "1984-03-01", gender: "M", blood: "AB+", address: "Manhattan, NY", registeredDate: "Jan 15, 2024", vitalsHistory: [], rxHistory: [] },
+    { id: 104, name: "Jessica Pearson", mobile: "9123456000", email: "jessica@firm.com", age: "38", dob: "1986-04-01", gender: "F", blood: "A-", address: "Queens, NY", registeredDate: "Jan 20, 2024", vitalsHistory: [], rxHistory: [] },
+    { id: 105, name: "Louis Litt", mobile: "9123456001", email: "louis@firm.com", age: "42", dob: "1982-05-01", gender: "M", blood: "O+", address: "Brooklyn, NY", registeredDate: "Jan 25, 2024", vitalsHistory: [], rxHistory: [] },
 ];
 
 const PROCEDURE_CATEGORIES = [
@@ -194,11 +198,6 @@ const INITIAL_MEDICINES = [
     { id: 3, name: "Amoxicillin", type: "Capsule", content: "250mg" },
     { id: 4, name: "Ibuprofen", type: "Syrup", content: "100mg/5ml" },
     { id: 5, name: "Insulin", type: "Injection", content: "100IU" },
-    { id: 6, name: "Insulin", type: "Injection", content: "100IU" },
-    { id: 7, name: "Insulin", type: "Injection", content: "100IU" },
-    { id: 8, name: "Insulin", type: "Injection", content: "100IU" },
-    { id: 9, name: "Insulin", type: "Injection", content: "100IU" },
-    { id: 10, name: "Insulin", type: "Injection", content: "100IU" },
 ];
 
 const FEATURES = [
@@ -398,6 +397,7 @@ const InputGroup = ({ icon: Icon, label, value, onChange, theme, multiline, keyb
 );
 
 // --- UPDATED TEMPLATE SCREEN ---
+// eslint-disable-next-line no-unused-vars
 const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, setMedicines, procedures, setProcedures, showToast, isPrescription = false, patient, onSavePrescription, layout }) => {
     const insets = useSafeAreaInsets();
     const [view, setView] = useState('list'); 
@@ -2854,11 +2854,13 @@ const MainApp = () => {
         const newRecord = {
             id: Date.now(),
             date: new Date().toISOString(),
+            templateName: prescription.name || '',
             diagnosis: prescription.diagnosis,
             medicines: prescription.medicines,
-            procedures: prescription.procedures, // NEW: Include procedures
+            procedures: prescription.procedures,
+            nextVisitInvestigations: prescription.nextVisitInvestigations,
             advice: prescription.advice,
-            referral: prescription.referral // NEW: Save referral
+            referral: prescription.referral
         };
 
         const updatedPatients = patients.map(p => {
@@ -2961,7 +2963,7 @@ const MainApp = () => {
                 return <VitalsScreenPage theme={theme} onBack={() => setCurrentScreen('patients')} patient={patientForVitals} onSaveVitals={handleSaveVitals} showToast={showToast} styles={styles} />;
             case 'prescription':
                 const patientForRx = patients.find(p => p.id === selectedPatientId);
-                return <TemplateScreen 
+                return <TemplateScreenPage 
                     theme={theme} 
                     layout={layout}
                     onBack={() => setCurrentScreen('patients')}
@@ -2975,10 +2977,11 @@ const MainApp = () => {
                     isPrescription={true}
                     patient={patientForRx}
                     onSavePrescription={handleSavePrescription}
+                    styles={styles}
                 />;
             case 'medicines': return <MedicinePage theme={theme} layout={layout} styles={styles} onBack={() => setCurrentScreen('home')} medicines={medicines} setMedicines={setMedicines} showToast={showToast} />;
             case 'templates': 
-                return <TemplateScreen 
+                return <TemplateScreenPage 
                     theme={theme} 
                     layout={layout}
                     onBack={() => setCurrentScreen('home')}
@@ -2989,6 +2992,7 @@ const MainApp = () => {
                     procedures={procedures} // NEW PROP PASSED
                     setProcedures={setProcedures} // NEW: Pass setter
                     showToast={showToast}
+                    styles={styles}
                 />;
             case 'procedures': 
                 return <ProceduresPage 

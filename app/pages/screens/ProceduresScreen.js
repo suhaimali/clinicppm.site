@@ -22,12 +22,13 @@ import {
     Trash2,
     X
 } from 'lucide-react-native';
-import { getMedicalTableTheme } from '../../constants/tableTheme';
+import { getMedicalModalTheme, getMedicalTableTheme } from '../../constants/tableTheme';
 import { CustomPicker, InputGroup } from '../../components/commons/FormControls';
 
 export default function ProceduresScreen({ theme, onBack, procedures, setProcedures, showToast, styles, layout, procedureCategories, pickerMaxHeight }) {
     const insets = useSafeAreaInsets();
     const tableTheme = getMedicalTableTheme(theme);
+    const modalTheme = getMedicalModalTheme(theme);
     const isTablet = Boolean(layout?.isTablet);
     const isCompact = !isTablet;
     const rowLimitOptions = [
@@ -348,22 +349,23 @@ export default function ProceduresScreen({ theme, onBack, procedures, setProcedu
 
             <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+                    <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
                         <TouchableOpacity style={{ flex: 1 }} onPress={() => setModalVisible(false)} />
-                        <View style={{ backgroundColor: theme.cardBg, borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: isCompact ? 18 : 25, paddingTop: 22, paddingBottom: isCompact ? 20 : 25, shadowColor: '#000', shadowOpacity: 0.3, elevation: 20, borderTopWidth: 4, borderTopColor: activeCategoryDetails.color, maxHeight: '90%' }}>
+                        <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
+                        <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 31, borderTopRightRadius: 31, paddingHorizontal: isCompact ? 18 : 25, paddingTop: 22, paddingBottom: isCompact ? 20 : 25, shadowColor: '#000', shadowOpacity: 0.3, elevation: 20, borderWidth: 1, borderColor: modalTheme.shellBorder, maxHeight: '90%' }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center', gap: 12 }}>
                                 <View style={{ flex: 1, minWidth: 0 }}>
                                     <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{isEditing ? 'Edit Procedure' : 'New Procedure'}</Text>
                                     <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>Create a clean, colorful clinical procedure card</Text>
                                 </View>
-                                <TouchableOpacity onPress={() => setModalVisible(false)} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}>
+                                <TouchableOpacity onPress={() => setModalVisible(false)} style={{ backgroundColor: modalTheme.cancelBg, padding: 8, borderRadius: 20 }}>
                                     <X size={20} color={theme.textDim} />
                                 </TouchableOpacity>
                             </View>
 
                             <ScrollView showsVerticalScrollIndicator={false}>
                                 <View style={{ gap: 15 }}>
-                                    <LinearGradient colors={theme.mode === 'dark' ? [`${activeCategoryDetails.color}33`, 'rgba(255,255,255,0.03)'] : [activeCategoryDetails.bg, '#ffffff']} style={{ borderRadius: 22, padding: 18, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : '#e2e8f0' }}>
+                                    <LinearGradient colors={theme.mode === 'dark' ? [`${activeCategoryDetails.color}33`, 'rgba(255,255,255,0.03)'] : [activeCategoryDetails.bg, '#ffffff']} style={{ borderRadius: 22, padding: 18, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                                         <View style={{ flexDirection: isCompact ? 'column' : 'row', alignItems: isCompact ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 12 }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                                                 <View style={{ width: 52, height: 52, borderRadius: 18, backgroundColor: activeCategoryDetails.color, alignItems: 'center', justifyContent: 'center' }}>
@@ -374,25 +376,25 @@ export default function ProceduresScreen({ theme, onBack, procedures, setProcedu
                                                     <Text style={{ fontSize: 17, color: theme.text, fontWeight: '700', marginTop: 4 }}>{formData.name || 'New clinical service'}</Text>
                                                 </View>
                                             </View>
-                                            <View style={{ alignSelf: isCompact ? 'flex-start' : 'auto', backgroundColor: theme.cardBg, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 }}>
+                                            <View style={{ alignSelf: isCompact ? 'flex-start' : 'auto', backgroundColor: modalTheme.surface, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 }}>
                                                 <Text style={{ color: activeCategoryDetails.color, fontSize: 12, fontWeight: '700' }}>{formData.category}</Text>
                                             </View>
                                         </View>
                                         <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 12 }}>{formData.notes || 'Add pricing, duration, and treatment notes to keep the procedure record complete and export-ready.'}</Text>
                                     </LinearGradient>
 
-                                    <View style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                                    <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                         <InputGroup icon={FileText} label="Procedure Name *" value={formData.name} onChange={(text) => setFormData({ ...formData, name: text })} theme={theme} placeholder="e.g. Root Canal" styles={styles} />
                                     </View>
                                     <View style={{ flexDirection: isCompact ? 'column' : 'row', gap: 15 }}>
-                                        <View style={{ flex: 1, backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                                        <View style={{ flex: 1, backgroundColor: modalTheme.sectionBg, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                             <InputGroup icon={Banknote} label="Cost (₹) *" value={formData.cost} onChange={(text) => setFormData({ ...formData, cost: text })} theme={theme} placeholder="500" keyboardType="numeric" styles={styles} />
                                         </View>
-                                        <View style={{ flex: 1, backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                                        <View style={{ flex: 1, backgroundColor: modalTheme.sectionBg, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                             <InputGroup icon={Timer} label="Duration" value={formData.duration} onChange={(text) => setFormData({ ...formData, duration: text })} theme={theme} placeholder="e.g. 30 min" styles={styles} />
                                         </View>
                                     </View>
-                                    <View style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                                    <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                         <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Category</Text>
                                         <TouchableOpacity onPress={() => setCategoryPickerVisible(true)} style={[styles.inputContainer, { backgroundColor: activeCategoryDetails.bg, borderColor: activeCategoryDetails.color, justifyContent: 'space-between', paddingRight: 15 }]}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -406,18 +408,19 @@ export default function ProceduresScreen({ theme, onBack, procedures, setProcedu
                                             <ChevronDown size={16} color={activeCategoryDetails.color} />
                                         </TouchableOpacity>
                                     </View>
-                                    <View style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                                    <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                         <InputGroup icon={Clipboard} label="Notes / Description" value={formData.notes} onChange={(text) => setFormData({ ...formData, notes: text })} theme={theme} placeholder="Additional details..." multiline styles={styles} />
                                     </View>
                                 </View>
                             </ScrollView>
 
                             <TouchableOpacity onPress={handleSave} style={{ marginTop: 25 }}>
-                                <LinearGradient colors={[theme.primary, theme.primaryDark]} style={{ padding: 18, borderRadius: 18, alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, elevation: 8 }}>
+                                <LinearGradient colors={modalTheme.primaryButton} style={{ padding: 18, borderRadius: 18, alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, elevation: 8 }}>
                                     <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}>{isEditing ? 'Save Changes' : 'Add Procedure'}</Text>
                                 </LinearGradient>
                             </TouchableOpacity>
                         </View>
+                        </LinearGradient>
                     </View>
                 </KeyboardAvoidingView>
             </Modal>

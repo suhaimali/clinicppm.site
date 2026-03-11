@@ -3,6 +3,7 @@ import React from 'react';
 import { FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Plus, PlusCircle, Search, X } from 'lucide-react-native';
 import { MEDICINE_CATEGORIES } from '../../constants/medical';
+import { getMedicalModalTheme } from '../../constants/tableTheme';
 
 function ManageableOptionList({ data, selectedValue, onSelect, onAdd, onLongPress, color, theme }) {
     return (
@@ -54,6 +55,7 @@ export default function PrescriptionMedicineModal({
 }) {
     const inventoryMatches = medicines.filter((item) => item.name.toLowerCase().includes(medSearch.toLowerCase()) && medSearch.length > 0);
     const isLocked = newMedForm.inventoryId !== null;
+    const modalTheme = getMedicalModalTheme(theme);
 
     const updateMedicineField = (field, value) => {
         setNewMedForm((prev) => ({ ...prev, [field]: value }));
@@ -62,24 +64,28 @@ export default function PrescriptionMedicineModal({
     return (
         <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
                     <TouchableOpacity style={{ flex: 1 }} onPress={onClose} />
-                    <View style={{ backgroundColor: theme.cardBg, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, height: '90%', shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.3, elevation: 20 }}>
+                    <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
+                    <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 31, borderTopRightRadius: 31, padding: 25, height: '90%', shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.3, elevation: 20, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
-                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{editingMedIndex !== null ? 'Update Medicine' : 'Add Medicine'}</Text>
-                            <TouchableOpacity onPress={onClose} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}><X size={20} color={theme.textDim} /></TouchableOpacity>
+                            <View>
+                                <Text style={{ fontSize: 11, color: modalTheme.chipText, fontWeight: '800', letterSpacing: 0.7 }}>PRESCRIPTION BUILDER</Text>
+                                <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text, marginTop: 4 }}>{editingMedIndex !== null ? 'Update Medicine' : 'Add Medicine'}</Text>
+                            </View>
+                            <TouchableOpacity onPress={onClose} style={{ backgroundColor: modalTheme.cancelBg, padding: 8, borderRadius: 20 }}><X size={20} color={modalTheme.cancelText} /></TouchableOpacity>
                         </View>
 
                         {!isLocked && (
                             <View style={{ marginBottom: 20 }}>
                                 <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600', fontSize: 12, letterSpacing: 1 }}>SEARCH INVENTORY</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 15, height: 55, borderWidth: 1, borderColor: theme.primary }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: modalTheme.infoBg, borderRadius: 16, paddingHorizontal: 15, height: 55, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                                     <Search size={20} color={theme.primary} style={{ marginRight: 10 }} />
                                     <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} placeholder="Type medicine name..." placeholderTextColor={theme.textDim} value={medSearch} onChangeText={setMedSearch} />
                                     {medSearch.length > 0 && <TouchableOpacity onPress={() => setMedSearch('')}><X size={18} color={theme.textDim} /></TouchableOpacity>}
                                 </View>
                                 {medSearch.length > 0 && inventoryMatches.length > 0 && (
-                                    <View style={{ maxHeight: 200, borderWidth: 1, borderColor: theme.border, borderTopWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, overflow: 'hidden', backgroundColor: theme.cardBg, elevation: 5 }}>
+                                    <View style={{ maxHeight: 200, borderWidth: 1, borderColor: modalTheme.sectionBorder, borderTopWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, overflow: 'hidden', backgroundColor: modalTheme.surface, elevation: 5 }}>
                                         <FlatList
                                             data={inventoryMatches}
                                             keyExtractor={(item) => item.id.toString()}
@@ -98,17 +104,17 @@ export default function PrescriptionMedicineModal({
                                     </View>
                                 )}
 
-                                <View style={{ marginTop: 16, gap: 14, padding: 16, borderRadius: 16, backgroundColor: theme.inputBg, borderWidth: 1, borderColor: theme.border }}>
+                                <View style={{ marginTop: 16, gap: 14, padding: 16, borderRadius: 16, backgroundColor: modalTheme.sectionBg, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                     <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 15 }}>New medicine details</Text>
                                     <TextInput
-                                        style={{ height: 52, borderRadius: 12, backgroundColor: theme.cardBg, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 14, color: theme.text, fontSize: 15 }}
+                                        style={{ height: 52, borderRadius: 12, backgroundColor: modalTheme.surface, borderWidth: 1, borderColor: modalTheme.sectionBorder, paddingHorizontal: 14, color: theme.text, fontSize: 15 }}
                                         placeholder="Medicine name"
                                         placeholderTextColor={theme.textDim}
                                         value={newMedForm.name}
                                         onChangeText={(value) => updateMedicineField('name', value)}
                                     />
                                     <TextInput
-                                        style={{ height: 52, borderRadius: 12, backgroundColor: theme.cardBg, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 14, color: theme.text, fontSize: 15 }}
+                                        style={{ height: 52, borderRadius: 12, backgroundColor: modalTheme.surface, borderWidth: 1, borderColor: modalTheme.sectionBorder, paddingHorizontal: 14, color: theme.text, fontSize: 15 }}
                                         placeholder="Content / strength"
                                         placeholderTextColor={theme.textDim}
                                         value={newMedForm.content}
@@ -150,31 +156,31 @@ export default function PrescriptionMedicineModal({
                         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                             <View style={{ gap: 20 }}>
                                 {isLocked && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.inputBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: theme.primary }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: modalTheme.infoBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                                         <View>
                                             <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>SELECTED MEDICINE</Text>
                                             <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 18 }}>{newMedForm.name}</Text>
                                         </View>
-                                        <TouchableOpacity onPress={onClearSelection} style={{ backgroundColor: theme.cardBg, padding: 8, borderRadius: 10 }}><X size={18} color="#ef4444" /></TouchableOpacity>
+                                        <TouchableOpacity onPress={onClearSelection} style={{ backgroundColor: modalTheme.surface, padding: 8, borderRadius: 10 }}><X size={18} color="#ef4444" /></TouchableOpacity>
                                     </View>
                                 )}
 
                                 <View style={{ flexDirection: 'row', gap: 15 }}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Content/Strength</Text>
-                                        <View style={{ height: 50, backgroundColor: theme.inputBg, borderRadius: 12, justifyContent: 'center', paddingHorizontal: 15, borderWidth: 1, borderColor: theme.border, opacity: 0.7 }}>
+                                        <View style={{ height: 50, backgroundColor: modalTheme.sectionBg, borderRadius: 12, justifyContent: 'center', paddingHorizontal: 15, borderWidth: 1, borderColor: modalTheme.sectionBorder, opacity: 0.85 }}>
                                             <Text style={{ color: theme.text, fontWeight: 'bold' }}>{newMedForm.content || 'N/A'}</Text>
                                         </View>
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Type</Text>
-                                        <View style={{ height: 50, backgroundColor: theme.inputBg, borderRadius: 12, justifyContent: 'center', paddingHorizontal: 15, borderWidth: 1, borderColor: theme.border, opacity: 0.7 }}>
+                                        <View style={{ height: 50, backgroundColor: modalTheme.sectionBg, borderRadius: 12, justifyContent: 'center', paddingHorizontal: 15, borderWidth: 1, borderColor: modalTheme.sectionBorder, opacity: 0.85 }}>
                                             <Text style={{ color: theme.text, fontWeight: 'bold' }}>{newMedForm.type || 'N/A'}</Text>
                                         </View>
                                     </View>
                                 </View>
 
-                                <View style={{ backgroundColor: theme.inputBg, padding: 15, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: theme.border }}>
+                                <View style={{ backgroundColor: modalTheme.sectionBg, padding: 15, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                     <View>
                                         <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16 }}>Tapering / Complex Dose?</Text>
                                         <Text style={{ color: theme.textDim, fontSize: 12 }}>Enable complex dosage schedule</Text>
@@ -218,11 +224,12 @@ export default function PrescriptionMedicineModal({
                         </ScrollView>
 
                         <TouchableOpacity onPress={onSubmit} style={{ marginTop: 25 }}>
-                            <LinearGradient colors={[theme.primary, theme.primaryDark]} style={{ padding: 18, borderRadius: 18, alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, elevation: 8 }}>
+                            <LinearGradient colors={modalTheme.primaryButton} style={{ padding: 18, borderRadius: 18, alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, elevation: 8 }}>
                                 <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}>{editingMedIndex !== null ? 'Update Prescription' : 'Add to Prescription'}</Text>
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
+                    </LinearGradient>
                 </View>
             </KeyboardAvoidingView>
         </Modal>

@@ -4,11 +4,13 @@ import { Alert, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Scroll
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AlertCircle, ArrowLeft, Cake, Calendar, Check, CheckCircle2, ChevronDown, Clock, Droplet, MessageCircle, Pencil, Phone, Plus, Search, Trash2, User, X, Mail } from 'lucide-react-native';
 import { BLOOD_GROUPS, INITIAL_FORM_STATE } from '../../constants/medical';
+import { getMedicalModalTheme } from '../../constants/tableTheme';
 import { CustomPicker, GenderSelector, InputGroup } from '../../components/commons/FormControls';
 import { calculateAge } from '../../utils/patient.js';
 
 export default function AppointmentScreen({ theme, onBack, form, setForm, appointments, setAppointments, patients, setPatients, onSelectPatient, onEditAppointment, viewMode, setViewMode, showToast, styles }) {
     const insets = useSafeAreaInsets();
+    const modalTheme = getMedicalModalTheme(theme);
     const [activeTab, setActiveTab] = useState('upcoming');
     const [searchQuery, setSearchQuery] = useState('');
     const [pickerType, setPickerType] = useState(null);
@@ -376,15 +378,17 @@ export default function AppointmentScreen({ theme, onBack, form, setForm, appoin
             {showDatePicker && (
                 Platform.OS === 'ios' ? (
                     <Modal transparent animationType="slide" visible={showDatePicker}>
-                        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-                            <View style={{ backgroundColor: theme.cardBg, padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+                        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: modalTheme.overlay }}>
+                            <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
+                            <View style={{ backgroundColor: modalTheme.surface, padding: 20, borderTopLeftRadius: 21, borderTopRightRadius: 21, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
-                                    <TouchableOpacity onPress={() => setShowDatePicker(false)}><Text style={{ color: theme.textDim, fontSize: 16 }}>Cancel</Text></TouchableOpacity>
+                                    <TouchableOpacity onPress={() => setShowDatePicker(false)}><Text style={{ color: modalTheme.cancelText, fontSize: 16, fontWeight: '700' }}>Cancel</Text></TouchableOpacity>
                                     <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16 }}>Select {pickerMode === 'time' ? 'Time' : pickerMode === 'dob' ? 'DOB' : 'Date'}</Text>
                                     <TouchableOpacity onPress={() => saveDateSelection(tempDate)}><Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 16 }}>Confirm</Text></TouchableOpacity>
                                 </View>
                                 <DateTimePicker testID="dateTimePicker" value={tempDate} mode={pickerMode === 'time' ? 'time' : 'date'} is24Hour={false} display="spinner" onChange={onDateChange} themeVariant={theme.mode} textColor={theme.text} />
                             </View>
+                            </LinearGradient>
                         </View>
                     </Modal>
                 ) : (

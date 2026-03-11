@@ -1,6 +1,8 @@
 import React from 'react';
 import { FlatList, Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronRight, X } from 'lucide-react-native';
+import { getMedicalModalTheme } from '../../constants/tableTheme';
 
 export function GenderSelector({ value, onChange, theme }) {
     const options = [
@@ -39,46 +41,66 @@ export function GenderSelector({ value, onChange, theme }) {
 }
 
 export function CustomPicker({ visible, title, data, onSelect, onClose, theme, colored = false, maxHeight }) {
+    const modalTheme = getMedicalModalTheme(theme);
+
     return (
         <Modal visible={visible} transparent animationType="slide">
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+            <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
                 <TouchableOpacity style={{ flex: 1 }} onPress={onClose} />
-                <View style={{ backgroundColor: theme.cardBg, borderTopLeftRadius: 25, borderTopRightRadius: 25, maxHeight, paddingBottom: 30 }}>
-                    <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: theme.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>{title}</Text>
-                        <TouchableOpacity onPress={onClose}>
-                            <X size={24} color={theme.textDim} />
-                        </TouchableOpacity>
+                <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 1.5, paddingHorizontal: 1.5, maxHeight }}>
+                    <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 27, borderTopRightRadius: 27, overflow: 'hidden', paddingBottom: 30, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
+                        <LinearGradient colors={modalTheme.headerColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: modalTheme.eyebrowText, letterSpacing: 0.7 }}>MEDICAL PICKER</Text>
+                                <Text style={{ fontSize: 20, fontWeight: '800', color: modalTheme.headerText, marginTop: 4 }} numberOfLines={1}>{title}</Text>
+                            </View>
+                            <TouchableOpacity onPress={onClose} style={{ backgroundColor: modalTheme.closeBg, padding: 8, borderRadius: 20 }}>
+                                <X size={22} color={modalTheme.closeIcon} />
+                            </TouchableOpacity>
+                        </LinearGradient>
+
+                        <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+                            <View style={{ backgroundColor: modalTheme.infoBg, borderColor: modalTheme.infoBorder, borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 }}>
+                                <Text style={{ color: modalTheme.chipText, fontSize: 12, fontWeight: '700' }}>Choose an option to update the clinical record.</Text>
+                            </View>
+                        </View>
+
+                        <FlatList
+                            data={data}
+                            keyExtractor={(item) => (typeof item === 'string' ? item : item.value)}
+                            contentContainerStyle={{ padding: 20, paddingTop: 16 }}
+                            renderItem={({ item, index }) => {
+                                const label = typeof item === 'string' ? item : item.label;
+                                const value = typeof item === 'string' ? item : item.value;
+                                const rowBg = index % 2 === 0 ? modalTheme.sectionBg : modalTheme.infoBg;
+
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            onSelect(value);
+                                            onClose();
+                                        }}
+                                        style={{ paddingVertical: 15, paddingHorizontal: 14, marginBottom: 10, borderWidth: 1, borderColor: modalTheme.sectionBorder, borderRadius: 18, backgroundColor: rowBg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15, flex: 1, minWidth: 0 }}>
+                                            {colored && item.icon ? (
+                                                <LinearGradient colors={theme.mode === 'dark' ? [item.bg, 'rgba(255,255,255,0.03)'] : [item.bg, '#ffffff']} style={{ width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
+                                                    <item.icon size={20} color={item.color} />
+                                                </LinearGradient>
+                                            ) : (
+                                                <View style={{ width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: modalTheme.chipBg }}>
+                                                    <ChevronRight size={18} color={modalTheme.chipText} />
+                                                </View>
+                                            )}
+                                            <Text style={{ flex: 1, minWidth: 0, fontSize: 16, color: colored ? item.color || theme.text : theme.text, fontWeight: '700' }}>{label}</Text>
+                                        </View>
+                                        <ChevronRight size={16} color={modalTheme.subtleText} />
+                                    </TouchableOpacity>
+                                );
+                            }}
+                        />
                     </View>
-                    <FlatList
-                        data={data}
-                        keyExtractor={(item) => (typeof item === 'string' ? item : item.value)}
-                        contentContainerStyle={{ padding: 20 }}
-                        renderItem={({ item }) => {
-                            const label = typeof item === 'string' ? item : item.label;
-                            const value = typeof item === 'string' ? item : item.value;
-                            return (
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        onSelect(value);
-                                        onClose();
-                                    }}
-                                    style={{ paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-                                >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
-                                        {colored && item.icon && (
-                                            <View style={{ backgroundColor: item.bg, width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
-                                                <item.icon size={20} color={item.color} />
-                                            </View>
-                                        )}
-                                        <Text style={{ fontSize: 16, color: colored ? item.color || theme.text : theme.text, fontWeight: colored ? 'bold' : 'normal' }}>{label}</Text>
-                                    </View>
-                                    <ChevronRight size={16} color={theme.textDim} />
-                                </TouchableOpacity>
-                            );
-                        }}
-                    />
-                </View>
+                </LinearGradient>
             </View>
         </Modal>
     );
