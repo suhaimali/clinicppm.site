@@ -30,6 +30,11 @@ export default function VitalsScreen({ theme, onBack, patient, onSaveVitals, sho
             return;
         }
 
+        if (!patient?.id) {
+            Alert.alert('Patient Missing', 'The selected patient record is unavailable. Please reopen vitals from the patient list.');
+            return;
+        }
+
         const newEntry = {
             id: Date.now(),
             date: new Date().toISOString(),
@@ -81,6 +86,14 @@ export default function VitalsScreen({ theme, onBack, patient, onSaveVitals, sho
             </View>
 
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+                {!patient && (
+                    <View style={{ backgroundColor: '#fff7ed', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#ffedd5', marginBottom: 25, flexDirection: 'row', gap: 10 }}>
+                        <AlertCircle size={20} color="#c2410c" />
+                        <Text style={{ color: '#9a3412', fontSize: 13, flex: 1, lineHeight: 20 }}>
+                            The selected patient record is unavailable. Go back to the patient list and reopen vitals.
+                        </Text>
+                    </View>
+                )}
                 <View style={{ backgroundColor: '#fff7ed', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#ffedd5', marginBottom: 25, flexDirection: 'row', gap: 10 }}>
                     <AlertCircle size={20} color="#c2410c" />
                     <Text style={{ color: '#9a3412', fontSize: 13, flex: 1, lineHeight: 20 }}>

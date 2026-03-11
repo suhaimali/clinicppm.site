@@ -68,7 +68,6 @@ export default function PatientScreen({ theme, onBack, patients, setPatients, se
 
     const filteredPatients = patients.filter((patient) => patient.name.toLowerCase().includes(searchQuery.toLowerCase()) || patient.mobile.includes(searchQuery) || patient.id.toString().includes(searchQuery));
     const visiblePatients = filteredPatients.slice(0, rowLimit);
-    const totalPatients = patients.length;
     const phoneRegistered = patients.filter((patient) => patient.mobile && patient.mobile.length > 0).length;
 
     const handleDelete = (id) => {
@@ -148,17 +147,10 @@ export default function PatientScreen({ theme, onBack, patients, setPatients, se
         setDetailModalVisible(true);
     };
 
-    const openFullProfile = (patient) => {
-        setSelectedPatient(patient);
-        setView('detail');
-    };
-
     const openEdit = (patient) => {
         setEditForm({ ...patient });
         setView('edit');
     };
-
-    const openNothing = () => {};
 
     const StatBadge = ({ label, value, icon: Icon, gradientColors, iconBg, iconColor, valueColor }) => (
         <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1, borderRadius: 18, padding: 16, minWidth: 130 }}>

@@ -2,7 +2,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Plus, PlusCircle, Search, X } from 'lucide-react-native';
-import { MEDICINE_CATEGORIES } from '../../constants/medical';
 import { getMedicalModalTheme } from '../../constants/tableTheme';
 
 function ManageableOptionList({ data, selectedValue, onSelect, onAdd, onLongPress, color, theme }) {
@@ -57,10 +56,6 @@ export default function PrescriptionMedicineModal({
     const isLocked = newMedForm.inventoryId !== null;
     const modalTheme = getMedicalModalTheme(theme);
 
-    const updateMedicineField = (field, value) => {
-        setNewMedForm((prev) => ({ ...prev, [field]: value }));
-    };
-
     return (
         <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -103,66 +98,27 @@ export default function PrescriptionMedicineModal({
                                         />
                                     </View>
                                 )}
-
-                                <View style={{ marginTop: 16, gap: 14, padding: 16, borderRadius: 16, backgroundColor: modalTheme.sectionBg, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
-                                    <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 15 }}>New medicine details</Text>
-                                    <TextInput
-                                        style={{ height: 52, borderRadius: 12, backgroundColor: modalTheme.surface, borderWidth: 1, borderColor: modalTheme.sectionBorder, paddingHorizontal: 14, color: theme.text, fontSize: 15 }}
-                                        placeholder="Medicine name"
-                                        placeholderTextColor={theme.textDim}
-                                        value={newMedForm.name}
-                                        onChangeText={(value) => updateMedicineField('name', value)}
-                                    />
-                                    <TextInput
-                                        style={{ height: 52, borderRadius: 12, backgroundColor: modalTheme.surface, borderWidth: 1, borderColor: modalTheme.sectionBorder, paddingHorizontal: 14, color: theme.text, fontSize: 15 }}
-                                        placeholder="Content / strength"
-                                        placeholderTextColor={theme.textDim}
-                                        value={newMedForm.content}
-                                        onChangeText={(value) => updateMedicineField('content', value)}
-                                    />
-                                    <View>
-                                        <Text style={{ color: theme.textDim, marginBottom: 10, fontWeight: '600' }}>Dosage form</Text>
-                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 10 }}>
-                                            {MEDICINE_CATEGORIES.map((item) => {
-                                                const isSelected = newMedForm.type === item.value;
-
-                                                return (
-                                                    <TouchableOpacity
-                                                        key={item.value}
-                                                        onPress={() => updateMedicineField('type', item.value)}
-                                                        style={{
-                                                            flexDirection: 'row',
-                                                            alignItems: 'center',
-                                                            gap: 8,
-                                                            paddingHorizontal: 14,
-                                                            paddingVertical: 10,
-                                                            borderRadius: 12,
-                                                            backgroundColor: isSelected ? item.color : theme.cardBg,
-                                                            borderWidth: 1,
-                                                            borderColor: isSelected ? item.color : theme.border
-                                                        }}
-                                                    >
-                                                        <item.icon size={16} color={isSelected ? 'white' : item.color} />
-                                                        <Text style={{ color: isSelected ? 'white' : theme.text, fontWeight: 'bold' }}>{item.label}</Text>
-                                                    </TouchableOpacity>
-                                                );
-                                            })}
-                                        </ScrollView>
+                                <LinearGradient colors={theme.mode === 'dark' ? ['rgba(16,185,129,0.18)', 'rgba(14,165,233,0.08)'] : ['#ecfdf5', '#eff6ff']} style={{ marginTop: 16, borderRadius: 18, padding: 1.5 }}>
+                                    <View style={{ padding: 16, borderRadius: 16, backgroundColor: modalTheme.sectionBg, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
+                                        <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 15 }}>Select from inventory</Text>
+                                        <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 6, lineHeight: 20 }}>Only saved medicines can be added here. Search above and choose one medicine to continue.</Text>
                                     </View>
-                                </View>
+                                </LinearGradient>
                             </View>
                         )}
 
                         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                             <View style={{ gap: 20 }}>
                                 {isLocked && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: modalTheme.infoBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
-                                        <View>
-                                            <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>SELECTED MEDICINE</Text>
-                                            <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 18 }}>{newMedForm.name}</Text>
+                                    <LinearGradient colors={theme.mode === 'dark' ? ['rgba(16,185,129,0.2)', 'rgba(14,165,233,0.1)'] : ['#dcfce7', '#e0f2fe']} style={{ borderRadius: 18, padding: 1.5 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: modalTheme.infoBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
+                                            <View>
+                                                <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>SELECTED MEDICINE</Text>
+                                                <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 18 }}>{newMedForm.name}</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={onClearSelection} style={{ backgroundColor: modalTheme.surface, padding: 8, borderRadius: 10 }}><X size={18} color="#ef4444" /></TouchableOpacity>
                                         </View>
-                                        <TouchableOpacity onPress={onClearSelection} style={{ backgroundColor: modalTheme.surface, padding: 8, borderRadius: 10 }}><X size={18} color="#ef4444" /></TouchableOpacity>
-                                    </View>
+                                    </LinearGradient>
                                 )}
 
                                 <View style={{ flexDirection: 'row', gap: 15 }}>

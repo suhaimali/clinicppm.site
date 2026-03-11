@@ -143,29 +143,29 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
     );
 
     // Medicine details modal
-    const DetailPopup = () => {
+    const DetailPopup = ({ medicine, visible, onClose }) => {
         const scaleAnim = useRef(new Animated.Value(0)).current;
 
         useEffect(() => {
-            if (detailVisible && selectedMed) {
+            if (visible && medicine) {
                 scaleAnim.setValue(0);
                 Animated.spring(scaleAnim, { toValue: 1, friction: 6, useNativeDriver: true }).start();
             }
-        }, [detailVisible, selectedMed, scaleAnim]);
+        }, [medicine, scaleAnim, visible]);
 
-        if (!selectedMed || !detailVisible) return null;
-        const catDetails = getCategoryDetails(selectedMed.type);
+        if (!medicine || !visible) return null;
+        const catDetails = getCategoryDetails(medicine.type);
         const CatIcon = catDetails.icon;
 
         return (
-            <Modal visible={detailVisible} transparent animationType="none" onRequestClose={() => setDetailVisible(false)}>
+            <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
                 <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setDetailVisible(false)} />
+                    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} />
                     <Animated.View style={{ width: '100%', maxWidth: 340, borderRadius: 26, overflow: 'hidden', transform: [{ scale: scaleAnim }] }}>
                         <LinearGradient colors={modalTheme.shellColors} style={{ borderRadius: 26, padding: 1.5 }}>
                         <View style={{ backgroundColor: modalTheme.surface, borderRadius: 25, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10, overflow: 'hidden', borderWidth: 1, borderColor: modalTheme.shellBorder }}>
                         <LinearGradient colors={[catDetails.color, '#0ea5e9']} style={{ padding: 20, alignItems: 'center', position: 'relative' }}>
-                            <TouchableOpacity onPress={() => setDetailVisible(false)} style={{ position: 'absolute', top: 15, right: 15, padding: 5, backgroundColor: modalTheme.closeBg, borderRadius: 20 }}>
+                            <TouchableOpacity onPress={onClose} style={{ position: 'absolute', top: 15, right: 15, padding: 5, backgroundColor: modalTheme.closeBg, borderRadius: 20 }}>
                                 <X size={20} color="white" />
                             </TouchableOpacity>
                             <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
@@ -173,20 +173,20 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
                             </View>
                             <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'white' }}>Medicine Details</Text>
                             <View style={{ marginTop: 10, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
-                                <Text style={{ color: 'white', fontSize: 12, fontWeight: '700', letterSpacing: 0.3 }}>{selectedMed.type} PROFILE</Text>
+                                <Text style={{ color: 'white', fontSize: 12, fontWeight: '700', letterSpacing: 0.3 }}>{medicine.type} PROFILE</Text>
                             </View>
                         </LinearGradient>
                         <View style={{ padding: 25, gap: 20 }}>
                             <View style={{ backgroundColor: catDetails.bg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                                 <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', marginBottom: 5 }}>Medicine Name</Text>
-                                <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>{selectedMed.name}</Text>
+                                <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>{medicine.name}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 18, borderWidth: 1, borderColor: modalTheme.sectionBorder, padding: 16, backgroundColor: modalTheme.sectionBg }}>
                                 <View>
                                     <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', marginBottom: 5 }}>Dosage Form</Text>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: catDetails.color }} />
-                                        <Text style={{ fontSize: 16, color: theme.text, fontWeight: '500' }}>{selectedMed.type}</Text>
+                                        <Text style={{ fontSize: 16, color: theme.text, fontWeight: '500' }}>{medicine.type}</Text>
                                     </View>
                                 </View>
                                 <View style={{ backgroundColor: catDetails.bg, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 }}>
@@ -195,7 +195,7 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
                             </View>
                             <View style={{ borderRadius: 18, padding: 16, backgroundColor: modalTheme.sectionBg, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                 <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', marginBottom: 5 }}>Content / Strength</Text>
-                                <Text style={{ fontSize: 16, color: theme.text }}>{selectedMed.content}</Text>
+                                <Text style={{ fontSize: 16, color: theme.text }}>{medicine.content}</Text>
                             </View>
                         </View>
                         </View>
@@ -432,7 +432,7 @@ export default function MedicineScreen({ theme, onBack, medicines, setMedicines,
                 </View>
             </ScrollView>
 
-            <DetailPopup />
+            <DetailPopup medicine={selectedMed} visible={detailVisible} onClose={() => setDetailVisible(false)} />
             <AddEditPopup />
             <CustomPicker visible={categoryPickerVisible} title="Select Dosage Form" data={MEDICINE_CATEGORIES} onClose={() => setCategoryPickerVisible(false)} onSelect={(val) => setFormData((prev) => ({ ...prev, type: val }))} theme={theme} colored />
             <CustomPicker visible={filterPickerVisible} title="Filter by Type" data={filterData} onClose={() => setFilterPickerVisible(false)} onSelect={(val) => setFilterType(val)} theme={theme} colored />

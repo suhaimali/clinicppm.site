@@ -60,23 +60,52 @@ import { buildMedicineRecord, findMatchingMedicine, sanitizeMedicineDraft } from
 import {
     buildTemplateRecord,
     createTemplateCopyName,
-    findMatchingTemplate,
-    hasTemplateContent,
-    mergeTemplateIntoDraft,
     sanitizeTemplateDraft
 } from '../../utils/template';
 
 const { height } = Dimensions.get('window');
 
+const createEmptyTemplateDraft = () => ({
+    id: null,
+    name: '',
+    diagnosis: '',
+    advice: '',
+    medicines: [],
+    procedures: [],
+    nextVisitInvestigations: [],
+    referral: ''
+});
+
+const createEmptyPrescriptionMedicineForm = () => ({
+    inventoryId: null,
+    name: '',
+    content: '',
+    type: 'Tablet',
+    doseQty: '',
+    freq: '',
+    duration: '',
+    instruction: '',
+    isTapering: false
+});
+
+const normalizeOptionValue = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+
+const buildProcedureDraftKey = (item = {}) => [
+    normalizeOptionValue(item.name).toLowerCase(),
+    normalizeOptionValue(item.category).toLowerCase(),
+    normalizeOptionValue(item.cost).toLowerCase()
+].join('|');
+
 const getPaddedContentStyle = (layout, style = {}) => ({
     width: '100%',
-    maxWidth: layout.contentMaxWidth,
+    maxWidth: layout?.contentMaxWidth,
     alignSelf: 'center',
-    paddingHorizontal: layout.gutter,
+    paddingHorizontal: layout?.gutter ?? 20,
     ...style,
 });
 
-export default function TemplateScreen({
+// --- UPDATED TEMPLATE SCREEN ---
+const TemplateScreen = ({
     theme,
     onBack,
     templates,
@@ -91,57 +120,59 @@ export default function TemplateScreen({
     onSavePrescription,
     layout,
     styles,
-}) {
+}) => {
     const insets = useSafeAreaInsets();
+    const safeLayout = layout || { contentMaxWidth: undefined, gutter: 20, isTablet: false };
     const modalTheme = getMedicalModalTheme(theme);
     const tableTheme = getMedicalTableTheme(theme);
     const [view, setView] = useState('list');
     const [searchQuery, setSearchQuery] = useState('');
-    const [editorForm, setEditorForm] = useState({
-        id: null,
-        name: '',
-        diagnosis: '',
-        advice: '',
-        medicines: [],
-        procedures: [],
-        nextVisitInvestigations: [],
-        referral: ''
-    });
+
+    // Editor State - Added 'nextVisitInvestigations' and 'referral'
+    const [editorForm, setEditorForm] = useState(createEmptyTemplateDraft);
     const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+
+    // State to toggle referral input visibility
     const [showReferral, setShowReferral] = useState(false);
+
+    // View Modal State
     const [viewModalVisible, setViewModalVisible] = useState(false);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
+
+    // Medicine Picker Modal State
     const [medModalVisible, setMedModalVisible] = useState(false);
     const [medSearch, setMedSearch] = useState('');
+
+    // --- PROCEDURE / INVESTIGATION STATES ---
     const [procModalVisible, setProcModalVisible] = useState(false);
     const [procModalType, setProcModalType] = useState('procedure');
     const [procSearch, setProcSearch] = useState('');
     const [procViewMode, setProcViewMode] = useState('list');
     const [showCustomInput, setShowCustomInput] = useState(false);
+
+    // Form for Adding/Editing Master Procedure
     const [masterProcForm, setMasterProcForm] = useState({ id: null, name: '', cost: '', category: 'General' });
+
+    // Form for Custom (One-off)
     const [customProcForm, setCustomProcForm] = useState({ name: '', cost: '' });
+
+    // Template Selection Modal for Rx Writer
     const [showTemplatePicker, setShowTemplatePicker] = useState(false);
     const [templatePickerSearch, setTemplatePickerSearch] = useState('');
     const [rowLimitPickerVisible, setRowLimitPickerVisible] = useState(false);
+
+    // Dynamic Arrays
     const [freqOptions, setFreqOptions] = useState(FREQUENCIES_INIT);
     const [durOptions, setDurOptions] = useState(DURATIONS_INIT);
     const [instrOptions, setInstrOptions] = useState(INSTRUCTIONS_INIT);
     const [doseOptions, setDoseOptions] = useState(DOSAGES_INIT);
+
+    // Input Modal State
     const [inputVisible, setInputVisible] = useState(false);
     const [inputCategory, setInputCategory] = useState(null);
     const [inputText, setInputText] = useState('');
     const [editingItem, setEditingItem] = useState(null);
-    const [newMedForm, setNewMedForm] = useState({
-        inventoryId: null,
-        name: '',
-        content: '',
-        type: 'Tablet',
-        doseQty: '',
-        freq: '',
-        duration: '',
-        instruction: '',
-        isTapering: false
-    });
+    const [newMedForm, setNewMedForm] = useState(createEmptyPrescriptionMedicineForm);
     const [editingMedIndex, setEditingMedIndex] = useState(null);
     const [rowLimit, setRowLimit] = useState(25);
 
@@ -151,67 +182,107 @@ export default function TemplateScreen({
         { label: '100 rows', value: 100 }
     ];
 
-    const getEmptyPrescriptionMedicineForm = () => ({
-        inventoryId: null,
-        name: '',
-        content: '',
-        type: 'Tablet',
-        doseQty: '',
-        freq: '',
-        duration: '',
-        instruction: '',
-        isTapering: false
-    });
+    const medicalPalette = {
+        hero: theme.mode === 'dark' ? ['#0f3b46', '#14532d', '#0f172a'] : ['#dcfce7', '#dbeafe', '#f0fdf4'],
+        heroBorder: theme.mode === 'dark' ? 'rgba(45,212,191,0.28)' : '#a7f3d0',
+        shell: theme.mode === 'dark' ? 'rgba(15, 23, 42, 0.72)' : 'rgba(255, 255, 255, 0.92)',
+        statA: theme.mode === 'dark' ? ['rgba(14,165,233,0.35)', 'rgba(37,99,235,0.18)'] : ['#e0f2fe', '#dbeafe'],
+        statB: theme.mode === 'dark' ? ['rgba(16,185,129,0.35)', 'rgba(21,128,61,0.18)'] : ['#dcfce7', '#ecfdf5'],
+        statC: theme.mode === 'dark' ? ['rgba(168,85,247,0.35)', 'rgba(124,58,237,0.18)'] : ['#f3e8ff', '#eef2ff'],
+        diagnosis: theme.mode === 'dark' ? ['rgba(59,130,246,0.18)', 'rgba(6,182,212,0.08)'] : ['#eff6ff', '#ecfeff'],
+        medicines: theme.mode === 'dark' ? ['rgba(16,185,129,0.16)', 'rgba(45,212,191,0.08)'] : ['#ecfdf5', '#f0fdf4'],
+        procedures: theme.mode === 'dark' ? ['rgba(249,115,22,0.16)', 'rgba(234,88,12,0.08)'] : ['#fff7ed', '#fffbeb'],
+        investigations: theme.mode === 'dark' ? ['rgba(14,165,233,0.16)', 'rgba(59,130,246,0.08)'] : ['#eff6ff', '#ecfeff'],
+        referral: theme.mode === 'dark' ? ['rgba(139,92,246,0.16)', 'rgba(124,58,237,0.08)'] : ['#f5f3ff', '#faf5ff'],
+        advice: theme.mode === 'dark' ? ['rgba(244,63,94,0.14)', 'rgba(251,146,60,0.08)'] : ['#fff1f2', '#fff7ed']
+    };
+
+    const renderMetricCard = (title, value, Icon, colors, accent) => (
+        <LinearGradient colors={colors} style={{ flexGrow: 1, flexBasis: safeLayout.isTablet ? 0 : '48%', borderRadius: 22, padding: 1.5 }}>
+            <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.85)' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1, paddingRight: 12 }}>
+                        <Text style={{ color: theme.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 }}>{title}</Text>
+                        <Text style={{ color: theme.text, fontSize: 24, fontWeight: '900', marginTop: 8 }}>{value}</Text>
+                    </View>
+                    <View style={{ width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: accent }}>
+                        <Icon size={20} color="white" />
+                    </View>
+                </View>
+            </View>
+        </LinearGradient>
+    );
+
+    const renderSectionHeader = (title, subtitle, Icon, accent) => (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: accent, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon size={18} color="white" />
+                </View>
+                <View>
+                    <Text style={{ fontSize: 14, fontWeight: '900', color: theme.text, textTransform: 'uppercase', letterSpacing: 0.9 }}>{title}</Text>
+                    <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{subtitle}</Text>
+                </View>
+            </View>
+        </View>
+    );
 
     useEffect(() => {
         if (isPrescription) {
             setView('edit');
-            setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [], referral: '' });
+            setEditorForm(createEmptyTemplateDraft());
             setShowReferral(false);
         }
     }, [isPrescription]);
 
     const filteredTemplates = templates.filter((template) => {
         const query = searchQuery.toLowerCase();
+        const templateMedicines = template.medicines || [];
 
-        return template.name.toLowerCase().includes(query)
+        return String(template?.name || '').toLowerCase().includes(query)
             || (template.diagnosis || '').toLowerCase().includes(query)
             || (template.advice || '').toLowerCase().includes(query)
             || (template.referral || '').toLowerCase().includes(query)
-            || (template.medicines || []).some((item) => item.name.toLowerCase().includes(query));
+            || templateMedicines.some((item) => String(item?.name || '').toLowerCase().includes(query));
     });
 
-    const totalMedicineLines = templates.reduce((count, template) => count + (template.medicines?.length || 0), 0);
-    const totalProcedureLines = templates.reduce((count, template) => count + (template.procedures?.length || 0) + (template.nextVisitInvestigations?.length || 0), 0);
+    const totalMedicineLines = templates.reduce((count, template) => count + ((template.medicines || []).length), 0);
+    const totalProcedureLines = templates.reduce((count, template) => count + ((template.procedures || []).length) + ((template.nextVisitInvestigations || []).length), 0);
     const visibleTemplates = filteredTemplates.slice(0, rowLimit);
-    const tableMinWidth = layout?.isTablet ? 1160 : 940;
+    const tableMinWidth = safeLayout.isTablet ? 1160 : 940;
 
     const applyTemplate = (template) => {
-        setEditorForm((prev) => mergeTemplateIntoDraft(prev, template));
+        setEditorForm((prev) => ({
+            ...prev,
+            diagnosis: template.diagnosis || prev.diagnosis,
+            advice: template.advice || prev.advice,
+            medicines: [...prev.medicines, ...(template.medicines || [])],
+            procedures: [...prev.procedures, ...(template.procedures || [])],
+            nextVisitInvestigations: [...prev.nextVisitInvestigations, ...(template.nextVisitInvestigations || [])],
+            referral: template.referral || prev.referral
+        }));
         if (template.referral) {
             setShowReferral(true);
         }
         setShowTemplatePicker(false);
+        setTemplatePickerSearch('');
         showToast('Applied', `${template.name} loaded successfully`, 'info');
     };
 
     const handleEdit = (item) => {
         setEditorForm({
             ...item,
-            medicines: [...item.medicines],
+            medicines: [...(item.medicines || [])],
             procedures: [...(item.procedures || [])],
             nextVisitInvestigations: [...(item.nextVisitInvestigations || [])]
         });
-        if (item.referral) {
-            setShowReferral(true);
-        }
+        setShowReferral(Boolean(item.referral));
         setView('edit');
     };
 
     const handleCreate = () => {
-        setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [], referral: '' });
+        setEditorForm(createEmptyTemplateDraft());
         setShowReferral(false);
-        setSaveAsTemplate(false);
         setView('edit');
     };
 
@@ -226,18 +297,6 @@ export default function TemplateScreen({
         showToast('Copied', `${copiedName} created`, 'success');
     };
 
-    const commitTemplateUpdate = (draft, templateId) => {
-        const sanitizedTemplate = sanitizeTemplateDraft(draft);
-
-        setTemplates((prev) => prev.map((template) => (template.id === templateId ? { ...sanitizedTemplate, id: templateId } : template)));
-    };
-
-    const commitNewTemplate = (draft) => {
-        const record = buildTemplateRecord(draft);
-        setTemplates((prev) => [record, ...prev]);
-        return record;
-    };
-
     const handleSaveTemplate = () => {
         const sanitizedTemplate = sanitizeTemplateDraft(editorForm);
 
@@ -246,76 +305,49 @@ export default function TemplateScreen({
             return;
         }
 
-        if (!hasTemplateContent(sanitizedTemplate)) {
-            Alert.alert('Empty Template', 'Add diagnosis, medicines, procedures, investigations, referral, or advice before saving.');
-            return;
-        }
-
         if (isPrescription) {
-            const finalizePrescription = () => {
-                onSavePrescription({
-                    ...sanitizedTemplate,
-                    patientId: patient.id,
-                    date: new Date().toISOString()
-                });
-            };
-
-            if (!saveAsTemplate) {
-                finalizePrescription();
+            if (!patient?.id || typeof onSavePrescription !== 'function') {
+                Alert.alert('Prescription Error', 'The patient record is unavailable. Please reopen the prescription from the patient list.');
                 return;
             }
 
-            if (!sanitizedTemplate.name) {
-                Alert.alert('Template Name Required', 'Enter a template name to save this prescription as a reusable template.');
+            if (
+                sanitizedTemplate.medicines.length === 0
+                && !sanitizedTemplate.advice
+                && sanitizedTemplate.procedures.length === 0
+                && sanitizedTemplate.nextVisitInvestigations.length === 0
+                && !sanitizedTemplate.referral
+            ) {
+                Alert.alert('Empty', 'Please add medicines, procedures, investigations, referral or advice.');
                 return;
             }
 
-            const existingTemplate = findMatchingTemplate(templates, sanitizedTemplate);
-            if (existingTemplate) {
-                Alert.alert('Template Already Exists', 'Choose whether to overwrite the existing template or save a new copy.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                        text: 'Save Copy',
-                        onPress: () => {
-                            const copiedName = createTemplateCopyName(templates, sanitizedTemplate.name);
-                            commitNewTemplate({ ...sanitizedTemplate, name: copiedName });
-                            showToast('Saved', `Prescription saved and template stored as ${copiedName}.`, 'success');
-                            finalizePrescription();
-                        }
-                    },
-                    {
-                        text: 'Overwrite',
-                        onPress: () => {
-                            commitTemplateUpdate(sanitizedTemplate, existingTemplate.id);
-                            showToast('Updated', `${existingTemplate.name} overwritten with the latest prescription.`, 'success');
-                            finalizePrescription();
-                        }
-                    }
-                ]);
-                return;
-            }
+            onSavePrescription({
+                ...sanitizedTemplate,
+                patientId: patient.id,
+                date: new Date().toISOString()
+            });
 
-            commitNewTemplate(sanitizedTemplate);
-            showToast('Saved', 'Prescription and template saved.', 'success');
-            finalizePrescription();
+            if (saveAsTemplate && sanitizedTemplate.name) {
+                const newTemplate = buildTemplateRecord(sanitizedTemplate);
+                setTemplates([newTemplate, ...templates]);
+                showToast('Saved', 'Prescription & New Template Saved!', 'success');
+            }
             return;
         }
 
-        const duplicateTemplate = findMatchingTemplate(templates, sanitizedTemplate, sanitizedTemplate.id || null);
-        if (duplicateTemplate) {
-            Alert.alert('Duplicate Template', 'A template with the same name already exists. Please rename this template or update the existing one.');
-            return;
-        }
-
+        let updatedTemplates;
         if (sanitizedTemplate.id) {
-            commitTemplateUpdate(sanitizedTemplate, sanitizedTemplate.id);
+            updatedTemplates = templates.map((template) => (template.id === sanitizedTemplate.id ? { ...sanitizedTemplate, id: sanitizedTemplate.id } : template));
             showToast('Success', 'Template Updated Successfully!', 'success');
         } else {
-            commitNewTemplate(sanitizedTemplate);
+            const newTemplate = buildTemplateRecord(sanitizedTemplate);
+            updatedTemplates = [newTemplate, ...templates];
             showToast('Success', 'New Template Created!', 'success');
         }
 
-        setEditorForm({ id: null, name: '', diagnosis: '', advice: '', medicines: [], procedures: [], nextVisitInvestigations: [], referral: '' });
+        setTemplates(updatedTemplates);
+        setEditorForm(createEmptyTemplateDraft());
         setShowReferral(false);
         setView('list');
     };
@@ -327,25 +359,45 @@ export default function TemplateScreen({
                 text: 'Delete',
                 style: 'destructive',
                 onPress: () => {
-                    setTemplates((prev) => prev.filter((template) => template.id !== id));
+                    setTemplates(templates.filter((template) => template.id !== id));
                     showToast('Deleted', 'Template removed.', 'error');
                 }
             }
         ]);
     };
 
-    const openTemplateDetails = (template) => {
-        setSelectedTemplate(template);
+    const openTemplateDetails = (t) => {
+        setSelectedTemplate(t);
         setViewModalVisible(true);
     };
 
     const addProcedureToForm = (procedureItem) => {
         const targetList = procModalType === 'investigation' ? 'nextVisitInvestigations' : 'procedures';
-        const newItem = { ...procedureItem, id: Date.now() };
+        const normalizedItem = {
+            ...procedureItem,
+            id: Date.now(),
+            name: normalizeOptionValue(procedureItem?.name),
+            category: normalizeOptionValue(procedureItem?.category) || 'General',
+            cost: normalizeOptionValue(procedureItem?.cost) || '0'
+        };
+
+        if (!normalizedItem.name) {
+            Alert.alert('Missing Info', 'Procedure name is required.');
+            return;
+        }
+
+        const existingItems = editorForm[targetList] || [];
+        const duplicateExists = existingItems.some((item) => buildProcedureDraftKey(item) === buildProcedureDraftKey(normalizedItem));
+
+        if (duplicateExists) {
+            showToast('Already Added', `${normalizedItem.name} is already in this ${targetList === 'procedures' ? 'template' : 'investigation list'}.`, 'info');
+            setProcModalVisible(false);
+            return;
+        }
 
         setEditorForm((prev) => ({
             ...prev,
-            [targetList]: [...prev[targetList], newItem]
+            [targetList]: [...prev[targetList], normalizedItem]
         }));
 
         setProcModalVisible(false);
@@ -353,21 +405,46 @@ export default function TemplateScreen({
     };
 
     const handleSaveMasterProcedure = () => {
-        if (!masterProcForm.name) {
+        const normalizedName = normalizeOptionValue(masterProcForm.name);
+        const normalizedCost = normalizeOptionValue(masterProcForm.cost) || '0';
+        const normalizedCategory = normalizeOptionValue(masterProcForm.category) || 'General';
+
+        if (!normalizedName) {
             Alert.alert('Missing Info', 'Name is required.');
             return;
         }
 
+        const normalizedProcedure = {
+            ...masterProcForm,
+            name: normalizedName,
+            cost: normalizedCost,
+            category: normalizedCategory
+        };
+
+        const duplicateProcedure = procedures.find((procedureItem) => {
+            if (masterProcForm.id && procedureItem.id === masterProcForm.id) {
+                return false;
+            }
+
+            return buildProcedureDraftKey(procedureItem) === buildProcedureDraftKey(normalizedProcedure);
+        });
+
+        if (duplicateProcedure) {
+            Alert.alert('Duplicate Item', 'An item with the same name, category, and price already exists in the master list.');
+            return;
+        }
+
         if (masterProcForm.id) {
-            const updated = procedures.map((procedureItem) => (procedureItem.id === masterProcForm.id ? masterProcForm : procedureItem));
+            const updated = procedures.map((procedureItem) => (procedureItem.id === masterProcForm.id ? normalizedProcedure : procedureItem));
             setProcedures(updated);
             showToast('Updated', 'Master list updated', 'success');
         } else {
-            const newProcedure = { ...masterProcForm, id: Date.now(), category: masterProcForm.category || 'General' };
+            const newProcedure = { ...normalizedProcedure, id: Date.now() };
             setProcedures([newProcedure, ...procedures]);
             showToast('Created', 'New item added to master list', 'success');
         }
 
+        setMasterProcForm({ id: null, name: '', cost: '', category: 'General' });
         setProcViewMode('list');
     };
 
@@ -386,15 +463,16 @@ export default function TemplateScreen({
     };
 
     const addCustomToRx = () => {
-        if (!customProcForm.name) {
+        const normalizedName = normalizeOptionValue(customProcForm.name);
+        if (!normalizedName) {
             Alert.alert('Missing Info', 'Name is required');
             return;
         }
 
         const customProcedure = {
             id: Date.now(),
-            name: customProcForm.name,
-            cost: customProcForm.cost || '0',
+            name: normalizedName,
+            cost: normalizeOptionValue(customProcForm.cost) || '0',
             category: 'Custom'
         };
 
@@ -463,7 +541,7 @@ export default function TemplateScreen({
 
     const openMedModal = () => {
         setEditingMedIndex(null);
-        setNewMedForm(getEmptyPrescriptionMedicineForm());
+        setNewMedForm(createEmptyPrescriptionMedicineForm());
         setMedSearch('');
         setMedModalVisible(true);
     };
@@ -474,7 +552,7 @@ export default function TemplateScreen({
         if (!sanitizedMedicine.name) {
             Alert.alert('Required', 'Medicine Name is required.');
             return;
-        }
+        } 
 
         let finalDosage = '';
         if (sanitizedMedicine.isTapering) {
@@ -563,16 +641,24 @@ export default function TemplateScreen({
     };
 
     const handleAddItem = () => {
-        if (!inputText.trim()) {
+        const normalizedValue = normalizeOptionValue(inputText);
+
+        if (!normalizedValue) {
+            setInputText('');
+            setEditingItem(null);
             setInputVisible(false);
             return;
         }
 
         const updateList = (list, setList) => {
             if (editingItem) {
-                setList(list.map((item) => (item === editingItem ? inputText : item)));
+                setList(list.map((item) => (item === editingItem ? normalizedValue : item)));
             } else {
-                setList([...list, inputText]);
+                const exists = list.some((item) => normalizeOptionValue(item).toLowerCase() === normalizedValue.toLowerCase());
+
+                if (!exists) {
+                    setList([...list, normalizedValue]);
+                }
             }
         };
 
@@ -586,6 +672,8 @@ export default function TemplateScreen({
             updateList(doseOptions, setDoseOptions);
         }
 
+        setInputText('');
+        setEditingItem(null);
         setInputVisible(false);
     };
 
@@ -609,35 +697,50 @@ export default function TemplateScreen({
         ]);
     };
 
+    // --- END PROCEDURE LOGIC ---
     const renderList = () => {
         return (
-            <View style={{ flex: 1 }}>
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
                 <View style={getPaddedContentStyle(layout, { marginBottom: 16, gap: 12 })}>
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                        <View style={{ flex: 1, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
-                            <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>TOTAL TEMPLATES</Text>
-                            <Text style={{ color: theme.text, fontSize: 24, fontWeight: '800', marginTop: 6 }}>{templates.length}</Text>
+                    <LinearGradient colors={medicalPalette.hero} style={{ borderRadius: 28, padding: 1.5, marginBottom: 2 }}>
+                        <View style={{ borderRadius: 27, padding: 20, backgroundColor: medicalPalette.shell, borderWidth: 1, borderColor: medicalPalette.heroBorder }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '900', letterSpacing: 1 }}>CLINICAL TEMPLATE CENTER</Text>
+                                    <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', marginTop: 8 }}>Build colourful, reusable prescriptions with medical context.</Text>
+                                    <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 20, marginTop: 10 }}>Manage diagnosis notes, medicines, procedures, investigations, and referrals in one medical workflow.</Text>
+                                </View>
+                                <LinearGradient colors={theme.mode === 'dark' ? ['rgba(45,212,191,0.25)', 'rgba(14,165,233,0.18)'] : ['#ccfbf1', '#dbeafe']} style={{ width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Clipboard size={32} color={theme.primary} />
+                                </LinearGradient>
+                            </View>
                         </View>
-                        <View style={{ flex: 1, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
-                            <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>MEDICINE LINES</Text>
-                            <Text style={{ color: theme.text, fontSize: 24, fontWeight: '800', marginTop: 6 }}>{totalMedicineLines}</Text>
-                        </View>
-                        <View style={{ flex: 1, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
-                            <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>PROC + INVESTIGATIONS</Text>
-                            <Text style={{ color: theme.text, fontSize: 24, fontWeight: '800', marginTop: 6 }}>{totalProcedureLines}</Text>
-                        </View>
+                    </LinearGradient>
+                    <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+                        {renderMetricCard('TOTAL TEMPLATES', templates.length, FileText, medicalPalette.statA, '#0ea5e9')}
+                        {renderMetricCard('MEDICINE LINES', totalMedicineLines, Pill, medicalPalette.statB, '#10b981')}
+                        {renderMetricCard('PROC + INVESTIGATIONS', totalProcedureLines, TestTube, medicalPalette.statC, '#8b5cf6')}
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.cardBg, borderRadius: 16, paddingHorizontal: 15, height: 55, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }}>
-                        <Search size={22} color={theme.textDim} style={{ marginRight: 10 }} />
-                        <TextInput style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '500' }} placeholder="Search Templates..." placeholderTextColor={theme.textDim} value={searchQuery} onChangeText={setSearchQuery} />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <X size={20} color={theme.textDim} />
-                            </TouchableOpacity>
-                        )}
-                    </View>
+                    <LinearGradient colors={theme.mode === 'dark' ? ['rgba(15,23,42,0.88)', 'rgba(30,41,59,0.88)'] : ['#ffffff', '#f8fafc']} style={{ borderRadius: 18, padding: 1.5 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: medicalPalette.shell, borderRadius: 16, paddingHorizontal: 15, height: 58, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(45,212,191,0.12)' : '#dbeafe', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.mode === 'dark' ? 'rgba(45,212,191,0.14)' : '#e0f2fe', marginRight: 10 }}>
+                                <Search size={18} color={theme.primary} />
+                            </View>
+                            <TextInput style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '600' }} placeholder="Search Templates..." placeholderTextColor={theme.textDim} value={searchQuery} onChangeText={setSearchQuery} />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearchQuery('')} style={{ width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.inputBg }}>
+                                    <X size={18} color={theme.textDim} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </LinearGradient>
                 </View>
-                <View style={getPaddedContentStyle(layout, { paddingBottom: 100 })}>
+                <View style={getPaddedContentStyle(layout, { paddingBottom: 12 })}>
                     {filteredTemplates.length > 0 ? (
                         <>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 6 }}>
@@ -665,7 +768,7 @@ export default function TemplateScreen({
                                                                 <FileText size={18} color={tableTheme.accentText} />
                                                             </LinearGradient>
                                                             <View style={{ flex: 1 }}>
-                                                                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }} numberOfLines={1}>{item.name}</Text>
+                                                                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }} numberOfLines={1}>{item.name || 'Untitled Template'}</Text>
                                                                 <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }} numberOfLines={1}>Reusable prescription template</Text>
                                                             </View>
                                                         </View>
@@ -676,7 +779,7 @@ export default function TemplateScreen({
 
                                                         <View style={{ width: 130, paddingRight: 12 }}>
                                                             <View style={{ alignSelf: 'flex-start', backgroundColor: tableTheme.viewActionBg, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 }}>
-                                                                <Text style={{ color: tableTheme.viewActionText, fontSize: 12, fontWeight: '700' }}>{item.medicines.length} items</Text>
+                                                                <Text style={{ color: tableTheme.viewActionText, fontSize: 12, fontWeight: '700' }}>{(item.medicines || []).length} items</Text>
                                                             </View>
                                                         </View>
 
@@ -727,13 +830,18 @@ export default function TemplateScreen({
                             </View>
                         </>
                     ) : (
-                        <View style={{ alignItems: 'center', marginTop: 50, opacity: 0.6 }}>
-                            <Sparkles size={60} color={theme.textDim} />
-                            <Text style={{ color: theme.textDim, marginTop: 15, fontSize: 16 }}>Create your first prescription template</Text>
-                        </View>
+                        <LinearGradient colors={medicalPalette.hero} style={{ borderRadius: 28, padding: 1.5, marginTop: 24 }}>
+                            <View style={{ alignItems: 'center', padding: 32, borderRadius: 27, backgroundColor: medicalPalette.shell, borderWidth: 1, borderColor: medicalPalette.heroBorder }}>
+                                <View style={{ width: 80, height: 80, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.mode === 'dark' ? 'rgba(45,212,191,0.14)' : '#ecfeff' }}>
+                                    <Sparkles size={40} color={theme.primary} />
+                                </View>
+                                <Text style={{ color: theme.text, marginTop: 18, fontSize: 20, fontWeight: '900' }}>{searchQuery ? 'No templates match your search.' : 'Create your first prescription template'}</Text>
+                                <Text style={{ color: theme.textDim, marginTop: 8, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>Design colourful clinical plans with medicines, procedures, investigations, and referrals.</Text>
+                            </View>
+                        </LinearGradient>
                     )}
                 </View>
-            </View>
+            </ScrollView>
         );
     };
 
@@ -779,71 +887,98 @@ export default function TemplateScreen({
         <ScrollView style={{ flex: 1 }} contentContainerStyle={getPaddedContentStyle(layout, { paddingBottom: 100 })}>
             {isPrescription && (
                 <View style={{ marginBottom: 20 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-                        <View>
-                            <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.text }}>{patient.name}</Text>
-                            <Text style={{ color: theme.textDim }}>{patient.age} Yrs • {patient.gender === 'M' ? 'Male' : 'Female'} • ID: #{patient.id}</Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={{ fontSize: 12, color: theme.textDim }}>Date</Text>
-                            <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text }}>{new Date().toLocaleDateString()}</Text>
-                        </View>
-                    </View>
-                    <View style={{ height: 1, backgroundColor: theme.border, marginBottom: 15 }} />
-                    {renderVitalsSummary()}
+                    {patient ? (
+                        <>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                                <View>
+                                    <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.text }}>{patient.name}</Text>
+                                    <Text style={{ color: theme.textDim }}>{patient.age || '--'} Yrs • {patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : 'Unknown'} • ID: #{patient.id}</Text>
+                                </View>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={{ fontSize: 12, color: theme.textDim }}>Date</Text>
+                                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text }}>{new Date().toLocaleDateString()}</Text>
+                                </View>
+                            </View>
+                            <View style={{ height: 1, backgroundColor: theme.border, marginBottom: 15 }} />
+                            {renderVitalsSummary()}
 
-                    <View style={{ marginBottom: 20, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                            <View>
-                                <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800' }}>Template Library</Text>
-                                <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 3 }}>Load a saved prescription structure into this visit</Text>
+                            <View style={{ marginBottom: 20, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                    <View>
+                                        <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800' }}>Template Library</Text>
+                                        <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 3 }}>Load a saved prescription structure into this visit</Text>
+                                    </View>
+                                    <View style={{ backgroundColor: theme.inputBg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 }}>
+                                        <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>{templates.length} saved</Text>
+                                    </View>
+                                </View>
+                                <TouchableOpacity onPress={() => setShowTemplatePicker(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.inputBg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.primary, marginTop: 8 }}>
+                                    <Copy size={18} color={theme.primary} />
+                                    <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Use Template in Prescription</Text>
+                                </TouchableOpacity>
                             </View>
-                            <View style={{ backgroundColor: theme.inputBg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 }}>
-                                <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>{templates.length} saved</Text>
-                            </View>
+                        </>
+                    ) : (
+                        <View style={{ marginBottom: 20, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800' }}>Patient unavailable</Text>
+                            <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 6 }}>The selected patient record could not be loaded. Return to the patient list and open the prescription again.</Text>
                         </View>
-                        <TouchableOpacity onPress={() => setShowTemplatePicker(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.inputBg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.primary, marginTop: 8 }}>
-                            <Copy size={18} color={theme.primary} />
-                            <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Use Template in Prescription</Text>
-                        </TouchableOpacity>
-                    </View>
+                    )}
                 </View>
             )}
 
             {!isPrescription && (
-                <View style={{ marginBottom: 25, backgroundColor: theme.cardBg, borderRadius: 20, padding: 5, shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, elevation: 5 }}>
-                    <LinearGradient colors={[theme.primary, theme.primaryDark]} style={{ borderRadius: 16, padding: 15 }}>
+                <LinearGradient colors={medicalPalette.hero} style={{ marginBottom: 25, borderRadius: 24, padding: 1.5 }}>
+                    <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 22, padding: 5, borderWidth: 1, borderColor: medicalPalette.heroBorder }}>
+                    <LinearGradient colors={[theme.primary, theme.primaryDark]} style={{ borderRadius: 18, padding: 18 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18, letterSpacing: 1 }}>RX TEMPLATE</Text>
-                            <FileText size={24} color="rgba(255,255,255,0.3)" />
+                            <View>
+                                <Text style={{ color: 'rgba(255,255,255,0.78)', fontWeight: '800', fontSize: 11, letterSpacing: 1 }}>MEDICAL TEMPLATE BUILDER</Text>
+                                <Text style={{ color: 'white', fontWeight: '900', fontSize: 20, letterSpacing: 0.8, marginTop: 6 }}>RX TEMPLATE</Text>
+                            </View>
+                            <View style={{ width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)' }}>
+                                <FileText size={24} color="white" />
+                            </View>
                         </View>
                     </LinearGradient>
-                    <View style={{ padding: 15 }}>
+                    <View style={{ padding: 16 }}>
                         <InputGroup icon={FileText} label="Template Name *" value={editorForm.name} onChange={(value) => setEditorForm({ ...editorForm, name: value })} theme={theme} placeholder="e.g. Viral Fever" styles={styles} />
                     </View>
-                </View>
+                    </View>
+                </LinearGradient>
             )}
 
-            <View style={{ marginBottom: 20 }}>
+            <LinearGradient colors={medicalPalette.diagnosis} style={{ marginBottom: 20, borderRadius: 22, padding: 1.5 }}>
+            <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.16)' : '#bfdbfe' }}>
+                {renderSectionHeader('Diagnosis', 'Clinical notes and presenting condition', Stethoscope, '#2563eb')}
                 <InputGroup icon={Stethoscope} label="Diagnosis / Clinical Notes" value={editorForm.diagnosis} onChange={(value) => setEditorForm({ ...editorForm, diagnosis: value })} theme={theme} placeholder="e.g. Viral Pyrexia, URTI" styles={styles} />
             </View>
+            </LinearGradient>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, marginTop: 10 }}>
+            <LinearGradient colors={medicalPalette.medicines} style={{ borderRadius: 22, padding: 1.5, marginTop: 10, marginBottom: 25 }}>
+            <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.16)' : '#bbf7d0' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Pill size={16} color={theme.textDim} />
-                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>MEDICINES (Rx)</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center' }}>
+                        <Pill size={18} color="white" />
+                    </View>
+                    <View>
+                        <Text style={{ fontSize: 14, fontWeight: '900', color: theme.text, textTransform: 'uppercase', letterSpacing: 1 }}>Medicines (Rx)</Text>
+                        <Text style={{ fontSize: 12, color: theme.textDim }}>Prescription medicines and dosage plan</Text>
+                    </View>
                 </View>
-                <TouchableOpacity onPress={openMedModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.inputBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.border }}>
+                <TouchableOpacity onPress={openMedModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.18)' : '#dcfce7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.28)' : '#86efac' }}>
                     <PlusCircle size={16} color={theme.primary} />
                     <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>Add Medicine</Text>
                 </TouchableOpacity>
             </View>
 
-            <View style={{ gap: 12, marginBottom: 25 }}>
+            <View style={{ gap: 12 }}>
                 {editorForm.medicines.map((medicine, index) => (
-                    <View key={index} style={{ backgroundColor: theme.cardBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2 }}>
-                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#f0f9ff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#bae6fd' }}>
-                            <Text style={{ fontWeight: 'bold', color: '#0ea5e9' }}>{index + 1}</Text>
+                    <LinearGradient key={index} colors={theme.mode === 'dark' ? ['rgba(16,185,129,0.16)', 'rgba(14,165,233,0.06)'] : ['#f0fdf4', '#ecfeff']} style={{ borderRadius: 18, padding: 1.5 }}>
+                    <View style={{ backgroundColor: medicalPalette.shell, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.9)', flexDirection: 'row', alignItems: 'center', gap: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2 }}>
+                        <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: '#0ea5e9', alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontWeight: '900', color: 'white' }}>{index + 1}</Text>
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={{ fontWeight: 'bold', color: theme.text, fontSize: 16 }}>{medicine.name} <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textDim }}>{medicine.dosage ? `(${medicine.dosage})` : ''}</Text></Text>
@@ -874,16 +1009,26 @@ export default function TemplateScreen({
                             <Trash2 size={18} color="#ef4444" />
                         </TouchableOpacity>
                     </View>
+                    </LinearGradient>
                 ))}
                 {editorForm.medicines.length === 0 && <View style={{ padding: 20, borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed', borderRadius: 16, alignItems: 'center', backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: '600' }}>No medicines added yet.</Text></View>}
             </View>
+            </View>
+            </LinearGradient>
 
+            <LinearGradient colors={medicalPalette.procedures} style={{ borderRadius: 22, padding: 1.5, marginBottom: 25 }}>
+            <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(249,115,22,0.16)' : '#fdba74' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Settings size={16} color={theme.textDim} />
-                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>PROCEDURES / SERVICES</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center' }}>
+                        <Settings size={18} color="white" />
+                    </View>
+                    <View>
+                        <Text style={{ fontSize: 14, fontWeight: '900', color: theme.text, textTransform: 'uppercase', letterSpacing: 1 }}>Procedures / Services</Text>
+                        <Text style={{ fontSize: 12, color: theme.textDim }}>Treatment procedures and estimated billing</Text>
+                    </View>
                 </View>
-                <TouchableOpacity onPress={openProcedureModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.inputBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.border }}>
+                <TouchableOpacity onPress={openProcedureModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.mode === 'dark' ? 'rgba(249,115,22,0.18)' : '#ffedd5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(249,115,22,0.28)' : '#fdba74' }}>
                     <PlusCircle size={16} color={theme.primary} />
                     <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>Add Procedure</Text>
                 </TouchableOpacity>
@@ -911,13 +1056,22 @@ export default function TemplateScreen({
                     </View>
                 )}
             </View>
+            </View>
+            </LinearGradient>
 
+            <LinearGradient colors={medicalPalette.investigations} style={{ borderRadius: 22, padding: 1.5, marginBottom: 25 }}>
+            <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(14,165,233,0.16)' : '#93c5fd' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <TestTube size={16} color={theme.textDim} />
-                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>INVESTIGATION ON NEXT VISIT</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#0284c7', alignItems: 'center', justifyContent: 'center' }}>
+                        <TestTube size={18} color="white" />
+                    </View>
+                    <View>
+                        <Text style={{ fontSize: 14, fontWeight: '900', color: theme.text, textTransform: 'uppercase', letterSpacing: 1 }}>Investigation On Next Visit</Text>
+                        <Text style={{ fontSize: 12, color: theme.textDim }}>Follow-up diagnostics and test planning</Text>
+                    </View>
                 </View>
-                <TouchableOpacity onPress={openInvestigationModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.inputBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.border }}>
+                <TouchableOpacity onPress={openInvestigationModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.mode === 'dark' ? 'rgba(14,165,233,0.18)' : '#e0f2fe', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(14,165,233,0.26)' : '#93c5fd' }}>
                     <PlusCircle size={16} color={theme.primary} />
                     <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>Add Investigation</Text>
                 </TouchableOpacity>
@@ -942,8 +1096,12 @@ export default function TemplateScreen({
                 ))}
                 {(editorForm.nextVisitInvestigations || []).length === 0 && <View style={{ padding: 20, borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed', borderRadius: 16, alignItems: 'center', backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: '600' }}>No investigations added.</Text></View>}
             </View>
+            </View>
+            </LinearGradient>
 
-            <View style={{ marginBottom: 20 }}>
+            <LinearGradient colors={medicalPalette.referral} style={{ marginBottom: 20, borderRadius: 22, padding: 1.5 }}>
+            <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(139,92,246,0.16)' : '#c4b5fd' }}>
+                {renderSectionHeader('Referral', 'Specialist consultation and handoff', UserPlus, '#7c3aed')}
                 {!showReferral ? (
                     <TouchableOpacity onPress={() => setShowReferral(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingVertical: 8 }}>
                         <View style={{ backgroundColor: theme.inputBg, padding: 6, borderRadius: 8, borderWidth: 1, borderColor: theme.border }}>
@@ -967,11 +1125,18 @@ export default function TemplateScreen({
                     </View>
                 )}
             </View>
+            </LinearGradient>
 
-            <InputGroup icon={Clipboard} label="Advice / Notes" value={editorForm.advice} onChange={(value) => setEditorForm({ ...editorForm, advice: value })} theme={theme} multiline placeholder="Enter patient advice (e.g., Drink warm water)..." styles={styles} />
+            <LinearGradient colors={medicalPalette.advice} style={{ borderRadius: 22, padding: 1.5 }}>
+            <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(251,146,60,0.16)' : '#fdba74' }}>
+                {renderSectionHeader('Advice', 'Lifestyle notes and discharge guidance', Clipboard, '#ea580c')}
+                <InputGroup icon={Clipboard} label="Advice / Notes" value={editorForm.advice} onChange={(value) => setEditorForm({ ...editorForm, advice: value })} theme={theme} multiline placeholder="Enter patient advice (e.g., Drink warm water)..." styles={styles} />
+            </View>
+            </LinearGradient>
 
             {isPrescription && (
-                <View style={{ marginTop: 20, backgroundColor: theme.cardBg, padding: 15, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: theme.border }}>
+                <LinearGradient colors={medicalPalette.hero} style={{ marginTop: 20, borderRadius: 22, padding: 1.5 }}>
+                <View style={{ backgroundColor: medicalPalette.shell, padding: 15, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: medicalPalette.heroBorder }}>
                     <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16 }}>Save as New Template</Text>
                         <Text style={{ color: theme.textDim, fontSize: 12 }}>Use this combination later</Text>
@@ -981,6 +1146,7 @@ export default function TemplateScreen({
                     </View>
                     <Switch value={saveAsTemplate} onValueChange={setSaveAsTemplate} trackColor={{ false: theme.inputBg, true: theme.primary }} thumbColor="white" />
                 </View>
+                </LinearGradient>
             )}
 
             {isPrescription && (
@@ -1159,6 +1325,10 @@ export default function TemplateScreen({
             return null;
         }
 
+        const selectedMedicines = selectedTemplate.medicines || [];
+        const selectedProcedures = selectedTemplate.procedures || [];
+        const selectedInvestigations = selectedTemplate.nextVisitInvestigations || [];
+
         return (
             <Modal visible={viewModalVisible} transparent animationType="fade" onRequestClose={() => setViewModalVisible(false)}>
                 <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', padding: 20 }}>
@@ -1178,12 +1348,12 @@ export default function TemplateScreen({
                             <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text, marginBottom: 5 }}>{selectedTemplate.name}</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 }}>
                                 <Stethoscope size={16} color={theme.textDim} />
-                                <Text style={{ fontSize: 14, color: theme.textDim, fontWeight: '600' }}>Diagnosis: {selectedTemplate.diagnosis}</Text>
+                                <Text style={{ fontSize: 14, color: theme.textDim, fontWeight: '600' }}>Diagnosis: {selectedTemplate.diagnosis || 'Not specified'}</Text>
                             </View>
                             <Text style={{ fontSize: 14, color: theme.textDim, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 10 }}>Medicines List</Text>
-                            {selectedTemplate.medicines.length > 0 && (
+                            {selectedMedicines.length > 0 && (
                                 <View style={{ gap: 10, marginBottom: 20 }}>
-                                    {selectedTemplate.medicines.map((medicine, index) => (
+                                    {selectedMedicines.map((medicine, index) => (
                                         <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, backgroundColor: modalTheme.infoBg, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: theme.primary, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                                             <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: modalTheme.surface, alignItems: 'center', justifyContent: 'center' }}>
                                                 <Pill size={16} color={theme.primary} />
@@ -1200,14 +1370,14 @@ export default function TemplateScreen({
                                     ))}
                                 </View>
                             )}
-                            {(selectedTemplate.procedures || []).length > 0 && (
+                            {selectedProcedures.length > 0 && (
                                 <View style={{ marginBottom: 20 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                                         <Settings size={14} color={theme.textDim} />
                                         <Text style={{ fontSize: 13, color: theme.textDim, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Procedures / Services</Text>
                                     </View>
                                     <View style={{ gap: 8 }}>
-                                        {selectedTemplate.procedures.map((proc, index) => (
+                                        {selectedProcedures.map((proc, index) => (
                                             <View key={index} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, backgroundColor: modalTheme.infoBg, borderRadius: 12, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                                                 <Text style={{ fontWeight: '600', color: theme.text, fontSize: 14 }}>{proc.name}</Text>
                                                 <Text style={{ fontWeight: '700', color: theme.primary, fontSize: 14 }}>₹{proc.cost}</Text>
@@ -1216,14 +1386,14 @@ export default function TemplateScreen({
                                     </View>
                                 </View>
                             )}
-                            {(selectedTemplate.nextVisitInvestigations || []).length > 0 && (
+                            {selectedInvestigations.length > 0 && (
                                 <View style={{ marginBottom: 20 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                                         <TestTube size={14} color={theme.textDim} />
                                         <Text style={{ fontSize: 13, color: theme.textDim, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Next Visit Investigations</Text>
                                     </View>
                                     <View style={{ gap: 8 }}>
-                                        {selectedTemplate.nextVisitInvestigations.map((inv, index) => (
+                                        {selectedInvestigations.map((inv, index) => (
                                             <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: modalTheme.infoBg, borderRadius: 12, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                                                 <TestTube size={14} color="#0284c7" />
                                                 <Text style={{ fontWeight: '600', color: theme.text, fontSize: 14 }}>{inv.name}</Text>
@@ -1269,15 +1439,17 @@ export default function TemplateScreen({
     const TemplatePickerModal = () => {
         const pickerFilteredTemplates = templates.filter((template) => {
             const query = templatePickerSearch.toLowerCase();
+            const templateMedicines = template.medicines || [];
 
-            return template.name.toLowerCase().includes(query)
+            return String(template?.name || '').toLowerCase().includes(query)
                 || (template.diagnosis || '').toLowerCase().includes(query)
-                || (template.medicines || []).some((medicine) => medicine.name.toLowerCase().includes(query));
+                || templateMedicines.some((medicine) => String(medicine?.name || '').toLowerCase().includes(query));
         });
 
         return (
         <Modal visible={showTemplatePicker} transparent animationType="slide" onRequestClose={() => setShowTemplatePicker(false)}>
             <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
+                <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowTemplatePicker(false)} />
                 <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
                 <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 27, borderTopRightRadius: 27, maxHeight: height * 0.78, paddingBottom: 30, borderWidth: 1, borderColor: modalTheme.shellBorder, overflow: 'hidden' }}>
                     <LinearGradient colors={modalTheme.headerColors} style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1323,7 +1495,7 @@ export default function TemplateScreen({
                                     {pickerFilteredTemplates.map((item, index) => {
                                         const isLastRow = index === pickerFilteredTemplates.length - 1;
                                         const summary = [
-                                            `${item.medicines.length} med`,
+                                            `${(item.medicines || []).length} med`,
                                             `${(item.procedures || []).length} proc`,
                                             `${(item.nextVisitInvestigations || []).length} inv`
                                         ].join(' • ');
@@ -1331,7 +1503,7 @@ export default function TemplateScreen({
                                         return (
                                             <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: index % 2 === 0 ? tableTheme.rowEven : tableTheme.rowOdd, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: isLastRow ? 0 : 1, borderBottomColor: tableTheme.rowBorder }}>
                                                 <View style={{ width: 220, paddingRight: 12 }}>
-                                                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }} numberOfLines={1}>{item.name}</Text>
+                                                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }} numberOfLines={1}>{item.name || 'Untitled Template'}</Text>
                                                 </View>
                                                 <View style={{ width: 230, paddingRight: 12 }}>
                                                     <Text style={{ fontSize: 13, color: theme.textDim, fontWeight: '600' }} numberOfLines={2}>{item.diagnosis || 'Not specified'}</Text>
@@ -1363,7 +1535,7 @@ export default function TemplateScreen({
 
     return (
         <View style={[styles.container, { backgroundColor: theme.bg }]}>
-            <View style={[styles.header, getPaddedContentStyle(layout, { marginTop: insets.top + 10 })]}>
+            <View style={[styles.header, getPaddedContentStyle(safeLayout, { marginTop: insets.top + 10 })]}>
                 {view === 'list' && !isPrescription ? (
                     <TouchableOpacity onPress={onBack} style={[styles.iconBtn, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
                         <ArrowLeft size={24} color={theme.text} />
@@ -1378,7 +1550,7 @@ export default function TemplateScreen({
                     <Text style={[styles.headerTitle, { color: theme.text }]}>
                         {isPrescription ? 'New Prescription' : view === 'list' ? 'Templates' : editorForm.id ? 'Edit Template' : 'New Template'}
                     </Text>
-                    {isPrescription ? <Text style={{ fontSize: 12, color: theme.textDim }}>Write Rx for {patient?.name}</Text> : view === 'list' && <Text style={{ fontSize: 12, color: theme.textDim }}>Manage your prescription sets</Text>}
+                    {isPrescription ? <Text style={{ fontSize: 12, color: theme.textDim }}>Write Rx for {patient?.name || 'selected patient'}</Text> : view === 'list' && <Text style={{ fontSize: 12, color: theme.textDim }}>Manage your prescription sets</Text>}
                 </View>
 
                 {view === 'list' && !isPrescription ? (
@@ -1445,4 +1617,6 @@ export default function TemplateScreen({
             </Modal>
         </View>
     );
-}
+};
+
+export default TemplateScreen;

@@ -70,7 +70,6 @@ export default function ProceduresScreen({ theme, onBack, procedures, setProcedu
 
     const totalAmount = filteredProcedures.reduce((sum, item) => sum + (parseFloat(item.cost) || 0), 0);
     const averageCost = filteredProcedures.length ? Math.round(totalAmount / filteredProcedures.length) : 0;
-    const activeDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
     const getCategoryDetails = (categoryName) => procedureCategories.find((item) => item.value === categoryName) || procedureCategories[0];
     const activeCategoryDetails = getCategoryDetails(formData.category);
     const contentWidthStyle = { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingHorizontal: layout.gutter };
@@ -97,7 +96,7 @@ export default function ProceduresScreen({ theme, onBack, procedures, setProcedu
                 return;
             }
 
-            const baseDirectory = FileSystem.documentDirectory || FileSystem.cacheDirectory || FileSystem.Paths?.document?.uri;
+            const baseDirectory = FileSystem.documentDirectory || FileSystem.cacheDirectory;
             if (!baseDirectory) {
                 throw new Error('No writable export directory available');
             }

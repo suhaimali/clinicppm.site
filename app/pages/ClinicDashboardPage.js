@@ -48,7 +48,6 @@ import VitalsScreenPage from './screens/VitalsScreen';
 import {
     Activity,
     AlertCircle,
-    Archive,
     ArrowLeft,
     Banknote,
     BookOpen,
@@ -66,18 +65,15 @@ import {
     Eye,
     FilePlus,
     FileText,
-    Filter,
     FlaskConical,
     HeartPulse,
     Home,
     Layers,
-    LayoutGrid,
     List,
     Mail,
     MapPin,
     Menu,
     MessageCircle,
-    Package,
     Pencil,
     Phone,
     Pill,
@@ -89,8 +85,6 @@ import {
     Share2,
     Sparkles,
     Stethoscope,
-    Syringe,
-    Tag,
     TestTube,
     Thermometer,
     Trash2,
@@ -180,16 +174,6 @@ const INITIAL_TEMPLATES = [
         nextVisitInvestigations: [],
         referral: ''
     },
-];
-
-const MEDICINE_CATEGORIES = [
-    { label: 'Tablet', value: 'Tablet', color: '#3b82f6', bg: '#eff6ff', icon: Pill },
-    { label: 'Capsule', value: 'Capsule', color: '#8b5cf6', bg: '#f5f3ff', icon: Pill },
-    { label: 'Syrup', value: 'Syrup', color: '#ec4899', bg: '#fdf2f8', icon: FlaskConical },
-    { label: 'Injection', value: 'Injection', color: '#ef4444', bg: '#fef2f2', icon: Syringe },
-    { label: 'Cream', value: 'Cream', color: '#f59e0b', bg: '#fffbeb', icon: Droplet },
-    { label: 'Drops', value: 'Drops', color: '#06b6d4', bg: '#ecfeff', icon: Droplet },
-    { label: 'Other', value: 'Other', color: '#64748b', bg: '#f1f5f9', icon: Package },
 ];
 
 const INITIAL_MEDICINES = [
@@ -1448,6 +1432,7 @@ const TemplateScreen = ({ theme, onBack, templates, setTemplates, medicines, set
 // --- END TEMPLATE SCREEN ---
 
 // --- VITALS SCREEN (REFACTORED - CLEAN & EDITABLE ONLY) ---
+// eslint-disable-next-line no-unused-vars
 const VitalsScreen = ({ theme, onBack, patient, onSaveVitals, showToast, layout }) => {
     const insets = useSafeAreaInsets();
     
@@ -1598,6 +1583,7 @@ const VitalsScreen = ({ theme, onBack, patient, onSaveVitals, showToast, layout 
 };
 
 // --- PATIENT MANAGEMENT SCREEN ---
+// eslint-disable-next-line no-unused-vars
 const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, setAppointments, selectedPatientId, onBookAppointment, onNavigate, showToast, layout }) => {
     const insets = useSafeAreaInsets();
     const createEmptyVitalsDraft = () => ({ sys: '', dia: '', pulse: '', spo2: '', weight: '', temp: '', tempUnit: 'C' });
@@ -1690,11 +1676,6 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
     const openPatientPopup = (patient) => {
         setViewingPatient(patient);
         setDetailModalVisible(true);
-    };
-
-    const openFullProfile = (patient) => {
-        setSelectedPatient(patient);
-        setView('detail');
     };
 
     const openEdit = (patient) => {
@@ -2224,6 +2205,7 @@ const PatientScreen = ({ theme, onBack, patients, setPatients, appointments, set
 // Medicine inventory screen moved to app/pages/screens/MedicineScreen.js
 
 // --- 4. APPOINTMENT SCREEN ---
+// eslint-disable-next-line no-unused-vars
 const AppointmentScreen = ({ theme, onBack, form, setForm, appointments, setAppointments, patients, setPatients, onSelectPatient, viewMode, setViewMode, showToast, layout }) => {
     const insets = useSafeAreaInsets();
     const [activeTab, setActiveTab] = useState('upcoming');
