@@ -1325,112 +1325,57 @@ const TemplateScreen = ({
             return null;
         }
 
-        const selectedMedicines = selectedTemplate.medicines || [];
-        const selectedProcedures = selectedTemplate.procedures || [];
-        const selectedInvestigations = selectedTemplate.nextVisitInvestigations || [];
-
         return (
             <Modal visible={viewModalVisible} transparent animationType="fade" onRequestClose={() => setViewModalVisible(false)}>
-                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', padding: 20 }}>
+                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', padding: 18 }}>
                     <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setViewModalVisible(false)} />
-                    <LinearGradient colors={modalTheme.shellColors} style={{ borderRadius: 26, padding: 1.5 }}>
-                    <View style={{ backgroundColor: modalTheme.surface, borderRadius: 25, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.3, elevation: 10, maxHeight: '80%', borderWidth: 1, borderColor: modalTheme.shellBorder }}>
-                        <LinearGradient colors={modalTheme.headerColors} style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                <FileText size={24} color="white" />
-                                <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold' }}>Template Details</Text>
+                    <View style={{ backgroundColor: theme.mode === 'dark' ? '#0f172a' : '#f1f5f9', borderRadius: 22, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.22, elevation: 10, maxHeight: '84%', borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(148,163,184,0.16)' : '#dbeafe' }}>
+                        <View style={{ padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.mode === 'dark' ? '#0f766e' : '#0ea5e9' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 10 }}>
+                                <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+                                    <FileText size={20} color="white" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: modalTheme.eyebrowText, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>MEDICAL TEMPLATE</Text>
+                                    <Text style={{ color: 'white', fontSize: 18, fontWeight: '800', marginTop: 3 }}>Template Details</Text>
+                                </View>
                             </View>
-                            <TouchableOpacity onPress={() => setViewModalVisible(false)} style={{ backgroundColor: modalTheme.closeBg, padding: 5, borderRadius: 15 }}>
-                                <X size={20} color="white" />
+                            <TouchableOpacity onPress={() => setViewModalVisible(false)} style={{ backgroundColor: modalTheme.closeBg, padding: 6, borderRadius: 16 }}>
+                                <X size={18} color="white" />
                             </TouchableOpacity>
-                        </LinearGradient>
-                        <ScrollView contentContainerStyle={{ padding: 20 }}>
-                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text, marginBottom: 5 }}>{selectedTemplate.name}</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 }}>
-                                <Stethoscope size={16} color={theme.textDim} />
-                                <Text style={{ fontSize: 14, color: theme.textDim, fontWeight: '600' }}>Diagnosis: {selectedTemplate.diagnosis || 'Not specified'}</Text>
-                            </View>
-                            <Text style={{ fontSize: 14, color: theme.textDim, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 10 }}>Medicines List</Text>
-                            {selectedMedicines.length > 0 && (
-                                <View style={{ gap: 10, marginBottom: 20 }}>
-                                    {selectedMedicines.map((medicine, index) => (
-                                        <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, backgroundColor: modalTheme.infoBg, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: theme.primary, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
-                                            <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: modalTheme.surface, alignItems: 'center', justifyContent: 'center' }}>
-                                                <Pill size={16} color={theme.primary} />
-                                            </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={{ fontWeight: 'bold', color: theme.text, fontSize: 15 }}>{medicine.name} <Text style={{ fontSize: 12, color: theme.textDim }}>({medicine.dosage})</Text></Text>
-                                                {medicine.isTapering ? (
-                                                    <Text style={{ fontSize: 12, color: '#c2410c', marginTop: 2, fontStyle: 'italic' }}>Tapering: {medicine.freq} for {medicine.duration}</Text>
-                                                ) : (
-                                                    <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{medicine.freq} • {medicine.duration} • {medicine.instruction}</Text>
-                                                )}
-                                            </View>
-                                        </View>
-                                    ))}
-                                </View>
-                            )}
-                            {selectedProcedures.length > 0 && (
-                                <View style={{ marginBottom: 20 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                                        <Settings size={14} color={theme.textDim} />
-                                        <Text style={{ fontSize: 13, color: theme.textDim, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Procedures / Services</Text>
+                        </View>
+                        <ScrollView style={{ backgroundColor: 'transparent' }} contentContainerStyle={{ padding: 16, paddingBottom: 18 }} showsVerticalScrollIndicator={false}>
+                            <LinearGradient colors={theme.mode === 'dark' ? ['rgba(16,185,129,0.16)', 'rgba(14,165,233,0.08)'] : ['#ecfdf5', '#eff6ff']} style={{ borderRadius: 16, padding: 1.5 }}>
+                                <View style={{ backgroundColor: theme.mode === 'dark' ? '#111827' : '#ffffff', borderRadius: 15, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.18)' : '#d1fae5' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                        <FileText size={16} color={theme.primary} />
+                                        <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Template Name</Text>
                                     </View>
-                                    <View style={{ gap: 8 }}>
-                                        {selectedProcedures.map((proc, index) => (
-                                            <View key={index} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, backgroundColor: modalTheme.infoBg, borderRadius: 12, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
-                                                <Text style={{ fontWeight: '600', color: theme.text, fontSize: 14 }}>{proc.name}</Text>
-                                                <Text style={{ fontWeight: '700', color: theme.primary, fontSize: 14 }}>₹{proc.cost}</Text>
-                                            </View>
-                                        ))}
-                                    </View>
+                                    <Text style={{ fontSize: 20, fontWeight: '800', color: theme.text }}>{selectedTemplate.name || 'Untitled Template'}</Text>
                                 </View>
-                            )}
-                            {selectedInvestigations.length > 0 && (
-                                <View style={{ marginBottom: 20 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                                        <TestTube size={14} color={theme.textDim} />
-                                        <Text style={{ fontSize: 13, color: theme.textDim, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Next Visit Investigations</Text>
+                            </LinearGradient>
+
+                            <LinearGradient colors={theme.mode === 'dark' ? ['rgba(59,130,246,0.14)', 'rgba(14,165,233,0.08)'] : ['#eff6ff', '#ecfeff']} style={{ borderRadius: 16, padding: 1.5, marginTop: 14 }}>
+                                <View style={{ backgroundColor: theme.mode === 'dark' ? '#111827' : '#ffffff', borderRadius: 15, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.18)' : '#bfdbfe' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                        <Stethoscope size={16} color="#2563eb" />
+                                        <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Diagnosis</Text>
                                     </View>
-                                    <View style={{ gap: 8 }}>
-                                        {selectedInvestigations.map((inv, index) => (
-                                            <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: modalTheme.infoBg, borderRadius: 12, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
-                                                <TestTube size={14} color="#0284c7" />
-                                                <Text style={{ fontWeight: '600', color: theme.text, fontSize: 14 }}>{inv.name}</Text>
-                                            </View>
-                                        ))}
+                                    <Text style={{ fontSize: 15, color: theme.text, fontWeight: '600', lineHeight: 22 }}>{selectedTemplate.diagnosis || 'Not specified'}</Text>
+                                </View>
+                            </LinearGradient>
+
+                            <LinearGradient colors={theme.mode === 'dark' ? ['rgba(251,146,60,0.14)', 'rgba(244,63,94,0.08)'] : ['#fff7ed', '#fff1f2']} style={{ borderRadius: 16, padding: 1.5, marginTop: 14 }}>
+                                <View style={{ backgroundColor: theme.mode === 'dark' ? '#111827' : '#ffffff', borderRadius: 15, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(251,146,60,0.18)' : '#fed7aa' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                        <Clipboard size={16} color="#c2410c" />
+                                        <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Note</Text>
                                     </View>
+                                    <Text style={{ color: theme.textDim, fontSize: 14, lineHeight: 20 }}>{selectedTemplate.advice || 'No specific advice.'}</Text>
                                 </View>
-                            )}
-                            {!!selectedTemplate.referral && (
-                                <View style={{ marginBottom: 20, backgroundColor: theme.mode === 'dark' ? 'rgba(139,92,246,0.15)' : '#f5f3ff', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(139,92,246,0.3)' : '#ddd6fe' }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-                                        <UserPlus size={14} color="#7c3aed" />
-                                        <Text style={{ fontWeight: '800', color: '#7c3aed', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Referral</Text>
-                                    </View>
-                                    <Text style={{ color: theme.text, fontWeight: '600' }}>{selectedTemplate.referral}</Text>
-                                </View>
-                            )}
-                            <View style={{ backgroundColor: '#fff7ed', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#fed7aa' }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                                    <Clipboard size={16} color="#c2410c" />
-                                    <Text style={{ fontWeight: 'bold', color: '#c2410c' }}>Advice / Notes</Text>
-                                </View>
-                                <Text style={{ color: '#9a3412', fontStyle: 'italic' }}>{selectedTemplate.advice || 'No specific advice.'}</Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-                                <TouchableOpacity onPress={() => { setViewModalVisible(false); handleDuplicateTemplate(selectedTemplate); }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ecfccb', padding: 12, borderRadius: 12, gap: 6 }}>
-                                    <Copy size={16} color="#4d7c0f" />
-                                    <Text style={{ color: '#4d7c0f', fontWeight: '800' }}>Copy</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={() => { setViewModalVisible(false); handleEdit(selectedTemplate); }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffedd5', padding: 12, borderRadius: 12, gap: 6 }}>
-                                    <Pencil size={16} color="#ea580c" />
-                                    <Text style={{ color: '#ea580c', fontWeight: '800' }}>Edit</Text>
-                                </TouchableOpacity>
-                            </View>
+                            </LinearGradient>
                         </ScrollView>
                     </View>
-                    </LinearGradient>
                 </View>
             </Modal>
         );
