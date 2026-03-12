@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { Plus, PlusCircle, Search, X } from 'lucide-react-native';
 import React from 'react';
 import { FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Plus, PlusCircle, Search, X } from 'lucide-react-native';
 import { getMedicalModalTheme } from '../../constants/tableTheme';
 
 function ManageableOptionList({ data, selectedValue, onSelect, onAdd, onLongPress, color, theme }) {
@@ -54,6 +54,7 @@ export default function PrescriptionMedicineModal({
 }) {
     const inventoryMatches = medicines.filter((item) => item.name.toLowerCase().includes(medSearch.toLowerCase()) && medSearch.length > 0);
     const isLocked = newMedForm.inventoryId !== null;
+    const isManualEntry = newMedForm.inventoryId === -1;
     const modalTheme = getMedicalModalTheme(theme);
 
     return (
@@ -101,24 +102,78 @@ export default function PrescriptionMedicineModal({
                                 <LinearGradient colors={theme.mode === 'dark' ? ['rgba(16,185,129,0.18)', 'rgba(14,165,233,0.08)'] : ['#ecfdf5', '#eff6ff']} style={{ marginTop: 16, borderRadius: 18, padding: 1.5 }}>
                                     <View style={{ padding: 16, borderRadius: 16, backgroundColor: modalTheme.sectionBg, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                         <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 15 }}>Select from inventory</Text>
-                                        <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 6, lineHeight: 20 }}>Only saved medicines can be added here. Search above and choose one medicine to continue.</Text>
+                                        <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 6, lineHeight: 20 }}>Search and pick an existing medicine, or use the button below to add a new medicine manually.</Text>
+                                        <TouchableOpacity
+                                            onPress={() => setNewMedForm((prev) => ({
+                                                ...prev,
+                                                inventoryId: -1,
+                                                name: prev.name || '',
+                                                content: prev.content || '',
+                                                type: prev.type || 'Tablet',
+                                                doseQty: '',
+                                                freq: '',
+                                                duration: '',
+                                                instruction: '',
+                                                isTapering: false
+                                            }))}
+                                            style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.18)' : '#dbeafe', borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.3)' : '#93c5fd', borderRadius: 10, paddingVertical: 10 }}
+                                        >
+                                            <PlusCircle size={15} color="#1d4ed8" />
+                                            <Text style={{ color: '#1d4ed8', fontWeight: '700', fontSize: 12 }}>Add New Medicine</Text>
+                                        </TouchableOpacity>
                                     </View>
                                 </LinearGradient>
                             </View>
                         )}
 
+                        {(isLocked || editingMedIndex !== null) && (
                         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                             <View style={{ gap: 20 }}>
                                 {isLocked && (
                                     <LinearGradient colors={theme.mode === 'dark' ? ['rgba(16,185,129,0.2)', 'rgba(14,165,233,0.1)'] : ['#dcfce7', '#e0f2fe']} style={{ borderRadius: 18, padding: 1.5 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: modalTheme.infoBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
                                             <View>
-                                                <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>SELECTED MEDICINE</Text>
-                                                <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 18 }}>{newMedForm.name}</Text>
+                                                <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>{isManualEntry ? 'NEW MEDICINE ENTRY' : 'SELECTED MEDICINE'}</Text>
+                                                <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 18 }}>{newMedForm.name || (isManualEntry ? 'Enter medicine details' : '')}</Text>
                                             </View>
                                             <TouchableOpacity onPress={onClearSelection} style={{ backgroundColor: modalTheme.surface, padding: 8, borderRadius: 10 }}><X size={18} color="#ef4444" /></TouchableOpacity>
                                         </View>
                                     </LinearGradient>
+                                )}
+
+                                {isManualEntry && (
+                                    <View style={{ gap: 10, backgroundColor: modalTheme.sectionBg, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
+                                        <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>NEW MEDICINE DETAILS</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 48, borderWidth: 1, borderColor: theme.border }}>
+                                            <TextInput
+                                                style={{ flex: 1, color: theme.text, fontSize: 15 }}
+                                                placeholder="Medicine Name *"
+                                                placeholderTextColor={theme.textDim}
+                                                value={newMedForm.name}
+                                                onChangeText={(value) => setNewMedForm((prev) => ({ ...prev, name: value }))}
+                                            />
+                                        </View>
+                                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 48, borderWidth: 1, borderColor: theme.border }}>
+                                                <TextInput
+                                                    style={{ flex: 1, color: theme.text, fontSize: 14 }}
+                                                    placeholder="Content/Strength"
+                                                    placeholderTextColor={theme.textDim}
+                                                    value={newMedForm.content}
+                                                    onChangeText={(value) => setNewMedForm((prev) => ({ ...prev, content: value }))}
+                                                />
+                                            </View>
+                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 48, borderWidth: 1, borderColor: theme.border }}>
+                                                <TextInput
+                                                    style={{ flex: 1, color: theme.text, fontSize: 14 }}
+                                                    placeholder="Type (Tablet)"
+                                                    placeholderTextColor={theme.textDim}
+                                                    value={newMedForm.type}
+                                                    onChangeText={(value) => setNewMedForm((prev) => ({ ...prev, type: value }))}
+                                                />
+                                            </View>
+                                        </View>
+                                    </View>
                                 )}
 
                                 <View style={{ flexDirection: 'row', gap: 15 }}>
@@ -178,12 +233,15 @@ export default function PrescriptionMedicineModal({
                                 )}
                             </View>
                         </ScrollView>
+                        )}
 
-                        <TouchableOpacity onPress={onSubmit} style={{ marginTop: 25 }}>
-                            <LinearGradient colors={modalTheme.primaryButton} style={{ padding: 18, borderRadius: 18, alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, elevation: 8 }}>
-                                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}>{editingMedIndex !== null ? 'Update Prescription' : 'Add to Prescription'}</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
+                        {(isLocked || editingMedIndex !== null) && (
+                            <TouchableOpacity onPress={onSubmit} style={{ marginTop: 25 }}>
+                                <LinearGradient colors={modalTheme.primaryButton} style={{ padding: 18, borderRadius: 18, alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, elevation: 8 }}>
+                                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}>{editingMedIndex !== null ? 'Update Prescription' : 'Add to Prescription'}</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        )}
                     </View>
                     </LinearGradient>
                 </View>

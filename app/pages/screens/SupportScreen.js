@@ -1,7 +1,7 @@
+import { Activity, ArrowLeft, HelpCircle, Mail, MessageCircle, Phone, User } from 'lucide-react-native';
 import React from 'react';
 import { Alert, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Activity, ArrowLeft, HelpCircle, Mail, MessageCircle, Phone, User } from 'lucide-react-native';
 
 export default function SupportScreen({ theme, onBack, layout, styles }) {
     const insets = useSafeAreaInsets();
@@ -17,6 +17,13 @@ export default function SupportScreen({ theme, onBack, layout, styles }) {
         phoneClean: '919072070473',
         email: 'muhammedfauzan7862@gmail.com'
     };
+    const astDeveloper = {
+        name: 'Nihan',
+        phone: '+91 77367 08566',
+        phoneClean: '917736708566',
+        email: 'qwerty311980@gmail.com'
+    };
+
 
     const handleCall = (number) => Linking.openURL(`tel:${number}`).catch(() => Alert.alert('Error', 'Cannot place call'));
     const handleEmail = (email) => Linking.openURL(`mailto:${email}`).catch(() => Alert.alert('Error', 'Cannot open email app'));
@@ -77,6 +84,9 @@ export default function SupportScreen({ theme, onBack, layout, styles }) {
                     <View style={{ flex: 1 }}>
                         <ContactCard title="Lead Developer" data={developer} isDev />
                     </View>
+                    <View style={{ flex: 1 }}>
+                        <ContactCard title="Assistant Developer" data={astDeveloper} isDev />
+                    </View>     
                 </View>
                 <View style={{ marginTop: 20, alignItems: 'center' }}>
                     <Text style={{ color: theme.textDim, fontSize: 12 }}>Suhaim Soft v2.0</Text>

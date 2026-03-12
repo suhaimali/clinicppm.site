@@ -30,8 +30,8 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import AppointmentEditModal from '../components/commons/AppointmentEditModal';
 import PrescriptionMedicineModal from '../components/commons/PrescriptionMedicineModal';
 import ToastNotification from '../components/commons/ToastNotification';
-import SideMenu from '../components/navbars/SideMenu';
 import SplashScreen from '../components/loaders/SplashScreen';
+import SideMenu from '../components/navbars/SideMenu';
 import { fetchClinicState, replaceClinicCollection } from '../utils/clinicApi';
 import { buildMedicineRecord, findMatchingMedicine, sanitizeMedicineDraft } from '../utils/medicine';
 import AppointmentScreenPage from './screens/AppointmentScreen';
@@ -2651,6 +2651,7 @@ const MainApp = () => {
     const [patients, setPatients] = useState(INITIAL_PATIENTS); 
     const [medicines, setMedicines] = useState(INITIAL_MEDICINES); 
     const [templates, setTemplates] = useState(INITIAL_TEMPLATES);
+    const [pendingPrescriptionTemplate, setPendingPrescriptionTemplate] = useState(null);
     const [procedures, setProcedures] = useState(INITIAL_PROCEDURES);
     const [isApiReady, setIsApiReady] = useState(false);
     const syncBlockedRef = useRef(true);
@@ -2858,6 +2859,13 @@ const MainApp = () => {
         setCurrentScreen('patients');
     };
 
+    const handleUseTemplateFromTemplateScreen = (template) => {
+        setPendingPrescriptionTemplate(template);
+        setSelectedPatientId(null);
+        setCurrentScreen('prescription');
+        showToast('Template Selected', 'Now select a patient in prescription screen.', 'info');
+    };
+
     const handleSelectPatientFromAppt = (appt) => {
         const patient = patients.find(p => p.mobile === appt.mobile || p.name === appt.name);
         if (patient) {
@@ -2958,7 +2966,11 @@ const MainApp = () => {
                     showToast={showToast}
                     isPrescription={true}
                     patient={patientForRx}
+                    patients={patients}
+                    onSelectPrescriptionPatient={(patientId) => setSelectedPatientId(patientId)}
                     onSavePrescription={handleSavePrescription}
+                    initialPrescriptionTemplate={pendingPrescriptionTemplate}
+                    onPrescriptionTemplateApplied={() => setPendingPrescriptionTemplate(null)}
                     styles={styles}
                 />;
             case 'medicines': return <MedicinePage theme={theme} layout={layout} styles={styles} onBack={() => setCurrentScreen('home')} medicines={medicines} setMedicines={setMedicines} showToast={showToast} />;
@@ -2974,6 +2986,7 @@ const MainApp = () => {
                     procedures={procedures} // NEW PROP PASSED
                     setProcedures={setProcedures} // NEW: Pass setter
                     showToast={showToast}
+                    onUseTemplateInPrescription={handleUseTemplateFromTemplateScreen}
                     styles={styles}
                 />;
             case 'procedures': 

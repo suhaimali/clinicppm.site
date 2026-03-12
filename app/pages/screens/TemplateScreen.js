@@ -1,21 +1,4 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useState } from 'react';
-import {
-    Alert,
-    Dimensions,
-    FlatList,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     Activity,
     ArrowLeft,
@@ -35,7 +18,6 @@ import {
     Save,
     Search,
     Settings,
-    Sparkles,
     Stethoscope,
     TestTube,
     Thermometer,
@@ -45,10 +27,26 @@ import {
     Weight,
     X
 } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import {
+    Alert,
+    Dimensions,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import PrescriptionMedicineModal from '../../components/commons/PrescriptionMedicineModal';
 import { CustomPicker, InputGroup } from '../../components/commons/FormControls';
-import { getMedicalModalTheme, getMedicalTableTheme } from '../../constants/tableTheme';
+import PrescriptionMedicineModal from '../../components/commons/PrescriptionMedicineModal';
 import {
     DOSAGES_INIT,
     DURATIONS_INIT,
@@ -56,6 +54,7 @@ import {
     INSTRUCTIONS_INIT,
     PROCEDURE_CATEGORIES
 } from '../../constants/medical';
+import { getMedicalModalTheme, getMedicalTableTheme } from '../../constants/tableTheme';
 import { buildMedicineRecord, findMatchingMedicine, sanitizeMedicineDraft } from '../../utils/medicine';
 import {
     buildTemplateRecord,
@@ -118,6 +117,11 @@ const TemplateScreen = ({
     isPrescription = false,
     patient,
     onSavePrescription,
+    onUseTemplateInPrescription,
+    initialPrescriptionTemplate,
+    onPrescriptionTemplateApplied,
+    patients = [],
+    onSelectPrescriptionPatient,
     layout,
     styles,
 }) => {
@@ -155,10 +159,24 @@ const TemplateScreen = ({
 
     // Form for Custom (One-off)
     const [customProcForm, setCustomProcForm] = useState({ name: '', cost: '' });
+    const [editTemplateItemVisible, setEditTemplateItemVisible] = useState(false);
+    const [editTemplateItemType, setEditTemplateItemType] = useState('procedure');
+    const [editTemplateItemIndex, setEditTemplateItemIndex] = useState(null);
+    const [editTemplateItemForm, setEditTemplateItemForm] = useState({ name: '', cost: '', category: 'General' });
 
     // Template Selection Modal for Rx Writer
     const [showTemplatePicker, setShowTemplatePicker] = useState(false);
     const [templatePickerSearch, setTemplatePickerSearch] = useState('');
+    const [patientPickerVisible, setPatientPickerVisible] = useState(false);
+    const [patientPickerSearch, setPatientPickerSearch] = useState('');
+    const [diagnosisPickerVisible, setDiagnosisPickerVisible] = useState(false);
+    const [diagnosisPickerSearch, setDiagnosisPickerSearch] = useState('');
+    const [customDiagnosisOptions, setCustomDiagnosisOptions] = useState([]);
+    const [editingDiagnosis, setEditingDiagnosis] = useState(null);
+    const [editingDiagnosisText, setEditingDiagnosisText] = useState('');
+    const [editingDiagnosisIsCustom, setEditingDiagnosisIsCustom] = useState(false);
+    const [hiddenDiagnosisOptions, setHiddenDiagnosisOptions] = useState([]);
+    const [showDiagnosisSuggestions, setShowDiagnosisSuggestions] = useState(false);
     const [rowLimitPickerVisible, setRowLimitPickerVisible] = useState(false);
 
     // Dynamic Arrays
@@ -197,22 +215,6 @@ const TemplateScreen = ({
         advice: theme.mode === 'dark' ? ['rgba(244,63,94,0.14)', 'rgba(251,146,60,0.08)'] : ['#fff1f2', '#fff7ed']
     };
 
-    const renderMetricCard = (title, value, Icon, colors, accent) => (
-        <LinearGradient colors={colors} style={{ flexGrow: 1, flexBasis: safeLayout.isTablet ? 0 : '48%', borderRadius: 22, padding: 1.5 }}>
-            <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.85)' }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flex: 1, paddingRight: 12 }}>
-                        <Text style={{ color: theme.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 }}>{title}</Text>
-                        <Text style={{ color: theme.text, fontSize: 24, fontWeight: '900', marginTop: 8 }}>{value}</Text>
-                    </View>
-                    <View style={{ width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: accent }}>
-                        <Icon size={20} color="white" />
-                    </View>
-                </View>
-            </View>
-        </LinearGradient>
-    );
-
     const renderSectionHeader = (title, subtitle, Icon, accent) => (
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -235,6 +237,15 @@ const TemplateScreen = ({
         }
     }, [isPrescription]);
 
+    useEffect(() => {
+        if (isPrescription && initialPrescriptionTemplate) {
+            applyTemplate(initialPrescriptionTemplate);
+            if (typeof onPrescriptionTemplateApplied === 'function') {
+                onPrescriptionTemplateApplied();
+            }
+        }
+    }, [isPrescription, initialPrescriptionTemplate]);
+
     const filteredTemplates = templates.filter((template) => {
         const query = searchQuery.toLowerCase();
         const templateMedicines = template.medicines || [];
@@ -248,8 +259,28 @@ const TemplateScreen = ({
 
     const totalMedicineLines = templates.reduce((count, template) => count + ((template.medicines || []).length), 0);
     const totalProcedureLines = templates.reduce((count, template) => count + ((template.procedures || []).length) + ((template.nextVisitInvestigations || []).length), 0);
+    const templateDiagnosisOptions = Array.from(new Set(templates.map((template) => normalizeOptionValue(template?.diagnosis)).filter(Boolean)));
+    const diagnosisOptions = Array.from(
+        new Set([...templateDiagnosisOptions, ...customDiagnosisOptions.map((item) => normalizeOptionValue(item)).filter(Boolean)])
+    ).filter((diagnosisName) => !hiddenDiagnosisOptions.some((hiddenItem) => hiddenItem.toLowerCase() === diagnosisName.toLowerCase()));
+    const diagnosisItems = diagnosisOptions.map((diagnosisName) => ({
+        name: diagnosisName,
+        isTemplate: templateDiagnosisOptions.some((item) => item.toLowerCase() === diagnosisName.toLowerCase()),
+        isCustom: customDiagnosisOptions.some((item) => item.toLowerCase() === diagnosisName.toLowerCase())
+    }));
+    const filteredDiagnosisItems = diagnosisItems.filter((diagnosisItem) => diagnosisItem.name.toLowerCase().includes(diagnosisPickerSearch.toLowerCase()));
+    const inlineDiagnosisSuggestions = filteredDiagnosisItems.slice(0, 8);
+    const filteredPatientOptions = (patients || []).filter((patientItem) => {
+        const query = patientPickerSearch.toLowerCase();
+        if (!query) return true;
+
+        return String(patientItem?.name || '').toLowerCase().includes(query)
+            || String(patientItem?.mobile || '').toLowerCase().includes(query)
+            || String(patientItem?.id || '').toLowerCase().includes(query);
+    });
     const visibleTemplates = filteredTemplates.slice(0, rowLimit);
     const tableMinWidth = safeLayout.isTablet ? 1160 : 940;
+    const popupHeight = safeLayout.isTablet ? height * 0.82 : height * 0.86;
 
     const applyTemplate = (template) => {
         setEditorForm((prev) => ({
@@ -361,6 +392,101 @@ const TemplateScreen = ({
                 onPress: () => {
                     setTemplates(templates.filter((template) => template.id !== id));
                     showToast('Deleted', 'Template removed.', 'error');
+                }
+            }
+        ]);
+    };
+
+    const handleUseTemplateInPrescription = (template) => {
+        if (typeof onUseTemplateInPrescription === 'function') {
+            onUseTemplateInPrescription(template);
+            return;
+        }
+
+        showToast('Info', 'Open a patient and create a prescription to use this template.', 'info');
+    };
+
+    const handleAddDiagnosisToList = (value = editorForm.diagnosis) => {
+        const normalizedDiagnosis = normalizeOptionValue(value);
+
+        if (!normalizedDiagnosis) {
+            Alert.alert('Required', 'Enter a diagnosis first.');
+            return;
+        }
+
+        const alreadyExists = diagnosisOptions.some((item) => item.toLowerCase() === normalizedDiagnosis.toLowerCase());
+        if (alreadyExists) {
+            showToast('Exists', 'Diagnosis is already in the list.', 'info');
+            return;
+        }
+
+        setCustomDiagnosisOptions((prev) => [normalizedDiagnosis, ...prev]);
+        showToast('Added', 'Diagnosis added to list.', 'success');
+    };
+
+    const handleStartEditDiagnosis = (diagnosisName, isCustom) => {
+        setEditingDiagnosis(diagnosisName);
+        setEditingDiagnosisText(diagnosisName);
+        setEditingDiagnosisIsCustom(Boolean(isCustom));
+    };
+
+    const handleSaveEditedDiagnosis = () => {
+        const oldDiagnosis = normalizeOptionValue(editingDiagnosis);
+        const updatedDiagnosis = normalizeOptionValue(editingDiagnosisText);
+
+        if (!oldDiagnosis) {
+            setEditingDiagnosis(null);
+            setEditingDiagnosisText('');
+            return;
+        }
+
+        if (!updatedDiagnosis) {
+            Alert.alert('Required', 'Diagnosis cannot be empty.');
+            return;
+        }
+
+        const duplicateExists = diagnosisOptions.some((item) => item.toLowerCase() === updatedDiagnosis.toLowerCase() && item.toLowerCase() !== oldDiagnosis.toLowerCase());
+        if (duplicateExists) {
+            showToast('Exists', 'Diagnosis is already in the list.', 'info');
+            return;
+        }
+
+        if (editingDiagnosisIsCustom) {
+            setCustomDiagnosisOptions((prev) => prev.map((item) => (item.toLowerCase() === oldDiagnosis.toLowerCase() ? updatedDiagnosis : item)));
+        } else {
+            // Template diagnoses are read-only at source level; edited value is stored as custom and old value is hidden from this list.
+            setCustomDiagnosisOptions((prev) => [updatedDiagnosis, ...prev]);
+            setHiddenDiagnosisOptions((prev) => (prev.some((item) => item.toLowerCase() === oldDiagnosis.toLowerCase()) ? prev : [oldDiagnosis, ...prev]));
+        }
+
+        if ((editorForm.diagnosis || '').toLowerCase() === oldDiagnosis.toLowerCase()) {
+            setEditorForm((prev) => ({ ...prev, diagnosis: updatedDiagnosis }));
+        }
+
+        setEditingDiagnosis(null);
+        setEditingDiagnosisText('');
+        setEditingDiagnosisIsCustom(false);
+        showToast('Updated', 'Diagnosis updated.', 'success');
+    };
+
+    const handleDeleteDiagnosisFromList = (diagnosisName, isCustom) => {
+        const normalizedDiagnosis = normalizeOptionValue(diagnosisName);
+
+        Alert.alert('Delete Diagnosis', `Remove "${normalizedDiagnosis}" from this list?`, [
+            { text: 'Cancel' },
+            {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: () => {
+                    if (isCustom) {
+                        setCustomDiagnosisOptions((prev) => prev.filter((item) => item.toLowerCase() !== normalizedDiagnosis.toLowerCase()));
+                    } else {
+                        setHiddenDiagnosisOptions((prev) => (prev.some((item) => item.toLowerCase() === normalizedDiagnosis.toLowerCase()) ? prev : [normalizedDiagnosis, ...prev]));
+                    }
+                    if ((editorForm.diagnosis || '').toLowerCase() === normalizedDiagnosis.toLowerCase()) {
+                        setEditorForm((prev) => ({ ...prev, diagnosis: '' }));
+                    }
+                    showToast('Deleted', 'Diagnosis removed from list.', 'error');
                 }
             }
         ]);
@@ -486,6 +612,65 @@ const TemplateScreen = ({
         const updated = [...editorForm[targetList]];
         updated.splice(index, 1);
         setEditorForm({ ...editorForm, [targetList]: updated });
+    };
+
+    const openEditItemFromForm = (index, type) => {
+        const targetList = type === 'investigation' ? 'nextVisitInvestigations' : 'procedures';
+        const selectedItem = editorForm[targetList]?.[index];
+
+        if (!selectedItem) {
+            return;
+        }
+
+        setEditTemplateItemType(type);
+        setEditTemplateItemIndex(index);
+        setEditTemplateItemForm({
+            name: selectedItem.name || '',
+            cost: selectedItem.cost || '0',
+            category: selectedItem.category || (type === 'investigation' ? 'Investigation' : 'General')
+        });
+        setEditTemplateItemVisible(true);
+    };
+
+    const saveEditedItemInForm = () => {
+        const normalizedName = normalizeOptionValue(editTemplateItemForm.name);
+        const normalizedCost = normalizeOptionValue(editTemplateItemForm.cost) || '0';
+        const normalizedCategory = normalizeOptionValue(editTemplateItemForm.category) || (editTemplateItemType === 'investigation' ? 'Investigation' : 'General');
+
+        if (!normalizedName) {
+            Alert.alert('Missing Info', 'Name is required.');
+            return;
+        }
+
+        const targetList = editTemplateItemType === 'investigation' ? 'nextVisitInvestigations' : 'procedures';
+        const sourceList = editorForm[targetList] || [];
+
+        const duplicateExists = sourceList.some((item, idx) => {
+            if (idx === editTemplateItemIndex) {
+                return false;
+            }
+
+            return buildProcedureDraftKey(item) === buildProcedureDraftKey({ name: normalizedName, cost: normalizedCost, category: normalizedCategory });
+        });
+
+        if (duplicateExists) {
+            showToast('Duplicate', 'Same item already exists.', 'info');
+            return;
+        }
+
+        const updatedList = [...sourceList];
+        const currentItem = updatedList[editTemplateItemIndex] || {};
+        updatedList[editTemplateItemIndex] = {
+            ...currentItem,
+            name: normalizedName,
+            cost: normalizedCost,
+            category: normalizedCategory
+        };
+
+        setEditorForm((prev) => ({ ...prev, [targetList]: updatedList }));
+        setEditTemplateItemVisible(false);
+        setEditTemplateItemIndex(null);
+        showToast('Updated', `${editTemplateItemType === 'investigation' ? 'Investigation' : 'Procedure'} updated`, 'success');
     };
 
     const calculateTotalCost = () => editorForm.procedures.reduce((total, item) => total + (parseFloat(item.cost) || 0), 0);
@@ -699,6 +884,20 @@ const TemplateScreen = ({
 
     // --- END PROCEDURE LOGIC ---
     const renderList = () => {
+        const StatCard = ({ title, value, icon: Icon, color, bg }) => (
+            <View style={{ width: safeLayout.isTablet ? '32%' : '48%', backgroundColor: bg, padding: 15, borderRadius: 16, marginBottom: 15 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontSize: 24, fontWeight: 'bold', color }}>{value}</Text>
+                        <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>{title}</Text>
+                    </View>
+                    <View style={{ backgroundColor: color, width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon size={16} color="#FFF" />
+                    </View>
+                </View>
+            </View>
+        );
+
         return (
             <ScrollView
                 style={{ flex: 1 }}
@@ -706,39 +905,30 @@ const TemplateScreen = ({
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
-                <View style={getPaddedContentStyle(layout, { marginBottom: 16, gap: 12 })}>
-                    <LinearGradient colors={medicalPalette.hero} style={{ borderRadius: 28, padding: 1.5, marginBottom: 2 }}>
-                        <View style={{ borderRadius: 27, padding: 20, backgroundColor: medicalPalette.shell, borderWidth: 1, borderColor: medicalPalette.heroBorder }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '900', letterSpacing: 1 }}>CLINICAL TEMPLATE CENTER</Text>
-                                    <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', marginTop: 8 }}>Build colourful, reusable prescriptions with medical context.</Text>
-                                    <Text style={{ color: theme.textDim, fontSize: 13, lineHeight: 20, marginTop: 10 }}>Manage diagnosis notes, medicines, procedures, investigations, and referrals in one medical workflow.</Text>
-                                </View>
-                                <LinearGradient colors={theme.mode === 'dark' ? ['rgba(45,212,191,0.25)', 'rgba(14,165,233,0.18)'] : ['#ccfbf1', '#dbeafe']} style={{ width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Clipboard size={32} color={theme.primary} />
-                                </LinearGradient>
-                            </View>
-                        </View>
-                    </LinearGradient>
-                    <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-                        {renderMetricCard('TOTAL TEMPLATES', templates.length, FileText, medicalPalette.statA, '#0ea5e9')}
-                        {renderMetricCard('MEDICINE LINES', totalMedicineLines, Pill, medicalPalette.statB, '#10b981')}
-                        {renderMetricCard('PROC + INVESTIGATIONS', totalProcedureLines, TestTube, medicalPalette.statC, '#8b5cf6')}
+                <View style={getPaddedContentStyle(layout, { marginBottom: 16 })}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                        <StatCard title="Total Templates" value={templates.length} icon={FileText} color="#2563eb" bg={theme.mode === 'dark' ? 'rgba(37, 99, 235, 0.15)' : '#eff6ff'} />
+                        <StatCard title="Medicine Lines" value={totalMedicineLines} icon={Pill} color="#10b981" bg={theme.mode === 'dark' ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5'} />
+                        <StatCard title="Proc + Investigations" value={totalProcedureLines} icon={TestTube} color="#7c3aed" bg={theme.mode === 'dark' ? 'rgba(124, 58, 237, 0.15)' : '#f5f3ff'} />
+                        <StatCard title="Visible Rows" value={visibleTemplates.length} icon={Settings} color="#f59e0b" bg={theme.mode === 'dark' ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb'} />
                     </View>
-                    <LinearGradient colors={theme.mode === 'dark' ? ['rgba(15,23,42,0.88)', 'rgba(30,41,59,0.88)'] : ['#ffffff', '#f8fafc']} style={{ borderRadius: 18, padding: 1.5 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: medicalPalette.shell, borderRadius: 16, paddingHorizontal: 15, height: 58, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(45,212,191,0.12)' : '#dbeafe', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }}>
-                            <View style={{ width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.mode === 'dark' ? 'rgba(45,212,191,0.14)' : '#e0f2fe', marginRight: 10 }}>
-                                <Search size={18} color={theme.primary} />
-                            </View>
-                            <TextInput style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: '600' }} placeholder="Search Templates..." placeholderTextColor={theme.textDim} value={searchQuery} onChangeText={setSearchQuery} />
+
+                    <View style={{ marginBottom: 20, backgroundColor: theme.cardBg, borderRadius: 18, borderWidth: 1, borderColor: theme.border, padding: 12, gap: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ color: theme.text, fontSize: 13, fontWeight: '700' }}>Filters</Text>
+                            <Text style={{ color: theme.textDim, fontSize: 12 }}>{searchQuery ? 'Filtered templates' : 'All templates'}</Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f8fafc', borderRadius: 12, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: theme.border }}>
+                            <Search size={20} color={theme.textDim} style={{ marginRight: 10 }} />
+                            <TextInput style={{ flex: 1, color: theme.text, fontSize: 15 }} placeholder="Search templates..." placeholderTextColor={theme.textDim} value={searchQuery} onChangeText={setSearchQuery} />
                             {searchQuery.length > 0 && (
-                                <TouchableOpacity onPress={() => setSearchQuery('')} style={{ width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.inputBg }}>
+                                <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                     <X size={18} color={theme.textDim} />
                                 </TouchableOpacity>
                             )}
                         </View>
-                    </LinearGradient>
+                    </View>
                 </View>
                 <View style={getPaddedContentStyle(layout, { paddingBottom: 12 })}>
                     {filteredTemplates.length > 0 ? (
@@ -792,6 +982,10 @@ const TemplateScreen = ({
                                                         </View>
 
                                                         <View style={{ flex: 1, minWidth: 240, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+                                                            <TouchableOpacity onPress={() => handleUseTemplateInPrescription(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.16)' : '#dcfce7', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 }}>
+                                                                <PlusCircle size={16} color="#059669" />
+                                                                <Text style={{ color: '#059669', fontSize: 12, fontWeight: '700' }}>Use Rx</Text>
+                                                            </TouchableOpacity>
                                                             <TouchableOpacity onPress={() => openTemplateDetails(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tableTheme.viewActionBg, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 }}>
                                                                 <Eye size={16} color={tableTheme.viewActionText} />
                                                                 <Text style={{ color: tableTheme.viewActionText, fontSize: 12, fontWeight: '700' }}>View</Text>
@@ -830,15 +1024,10 @@ const TemplateScreen = ({
                             </View>
                         </>
                     ) : (
-                        <LinearGradient colors={medicalPalette.hero} style={{ borderRadius: 28, padding: 1.5, marginTop: 24 }}>
-                            <View style={{ alignItems: 'center', padding: 32, borderRadius: 27, backgroundColor: medicalPalette.shell, borderWidth: 1, borderColor: medicalPalette.heroBorder }}>
-                                <View style={{ width: 80, height: 80, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.mode === 'dark' ? 'rgba(45,212,191,0.14)' : '#ecfeff' }}>
-                                    <Sparkles size={40} color={theme.primary} />
-                                </View>
-                                <Text style={{ color: theme.text, marginTop: 18, fontSize: 20, fontWeight: '900' }}>{searchQuery ? 'No templates match your search.' : 'Create your first prescription template'}</Text>
-                                <Text style={{ color: theme.textDim, marginTop: 8, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>Design colourful clinical plans with medicines, procedures, investigations, and referrals.</Text>
-                            </View>
-                        </LinearGradient>
+                        <View style={{ alignItems: 'center', marginTop: 40, opacity: 0.5 }}>
+                            <Clipboard size={50} color={theme.textDim} />
+                            <Text style={{ color: theme.textDim, marginTop: 10 }}>{searchQuery ? 'No templates match your search.' : 'No templates found.'}</Text>
+                        </View>
                     )}
                 </View>
             </ScrollView>
@@ -921,7 +1110,14 @@ const TemplateScreen = ({
                     ) : (
                         <View style={{ marginBottom: 20, backgroundColor: theme.cardBg, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border }}>
                             <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800' }}>Patient unavailable</Text>
-                            <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 6 }}>The selected patient record could not be loaded. Return to the patient list and open the prescription again.</Text>
+                            <Text style={{ color: theme.textDim, fontSize: 13, marginTop: 6 }}>Select a patient to continue this prescription.</Text>
+                            <TouchableOpacity
+                                onPress={() => setPatientPickerVisible(true)}
+                                style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.18)' : '#dbeafe', borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.26)' : '#93c5fd', borderRadius: 12, paddingVertical: 10 }}
+                            >
+                                <UserPlus size={16} color="#2563eb" />
+                                <Text style={{ color: '#2563eb', fontWeight: '700' }}>Select Patient</Text>
+                            </TouchableOpacity>
                         </View>
                     )}
                 </View>
@@ -951,35 +1147,87 @@ const TemplateScreen = ({
             <LinearGradient colors={medicalPalette.diagnosis} style={{ marginBottom: 20, borderRadius: 22, padding: 1.5 }}>
             <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.16)' : '#bfdbfe' }}>
                 {renderSectionHeader('Diagnosis', 'Clinical notes and presenting condition', Stethoscope, '#2563eb')}
-                <InputGroup icon={Stethoscope} label="Diagnosis / Clinical Notes" value={editorForm.diagnosis} onChange={(value) => setEditorForm({ ...editorForm, diagnosis: value })} theme={theme} placeholder="e.g. Viral Pyrexia, URTI" styles={styles} />
+                <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Diagnosis Search / Select</Text>
+                <View style={[styles.inputContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+                    <Search size={18} color={theme.textDim} />
+                    <TextInput
+                        style={[styles.textInput, { color: theme.text }]}
+                        value={diagnosisPickerSearch}
+                        onFocus={() => setShowDiagnosisSuggestions(true)}
+                        onChangeText={(value) => {
+                            setDiagnosisPickerSearch(value);
+                            setEditorForm((prev) => ({ ...prev, diagnosis: value }));
+                            setShowDiagnosisSuggestions(true);
+                        }}
+                        placeholder="Search diagnosis from list..."
+                        placeholderTextColor={theme.textDim}
+                    />
+                    {diagnosisPickerSearch.length > 0 && (
+                        <TouchableOpacity
+                            onPress={() => {
+                                setDiagnosisPickerSearch('');
+                                setShowDiagnosisSuggestions(false);
+                            }}
+                        >
+                            <X size={16} color={theme.textDim} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {showDiagnosisSuggestions && diagnosisOptions.length > 0 && (
+                    <View style={{ marginTop: 8, backgroundColor: theme.cardBg, borderRadius: 12, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' }}>
+                        <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                            {inlineDiagnosisSuggestions.length > 0 ? inlineDiagnosisSuggestions.map((diagnosisItem, index) => (
+                                <TouchableOpacity
+                                    key={`${diagnosisItem.name}-${index}`}
+                                    onPress={() => {
+                                        setEditorForm((prev) => ({ ...prev, diagnosis: diagnosisItem.name }));
+                                        setDiagnosisPickerSearch(diagnosisItem.name);
+                                        setShowDiagnosisSuggestions(false);
+                                    }}
+                                    style={{ paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: index === inlineDiagnosisSuggestions.length - 1 ? 0 : 1, borderBottomColor: theme.border }}
+                                >
+                                    <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>{diagnosisItem.name}</Text>
+                                </TouchableOpacity>
+                            )) : (
+                                <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
+                                    <Text style={{ color: theme.textDim, fontSize: 12 }}>No matching diagnosis found.</Text>
+                                </View>
+                            )}
+                        </ScrollView>
+                    </View>
+                )}
+
+                {editorForm.diagnosis ? (
+                    <Text style={{ marginTop: 8, color: theme.textDim, fontSize: 12 }}>Selected: {editorForm.diagnosis}</Text>
+                ) : null}
+                <TouchableOpacity
+                    onPress={() => handleAddDiagnosisToList(editorForm.diagnosis)}
+                    style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.mode === 'dark' ? 'rgba(37,99,235,0.14)' : '#eff6ff', paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.24)' : '#bfdbfe' }}
+                >
+                    <PlusCircle size={16} color="#2563eb" />
+                    <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 13 }}>Add Diagnosis To List</Text>
+                </TouchableOpacity>
+                {diagnosisOptions.length > 0 && (
+                    <TouchableOpacity
+                        onPress={() => setDiagnosisPickerVisible(true)}
+                        style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.16)' : '#dbeafe', paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.28)' : '#93c5fd' }}
+                    >
+                        <Search size={16} color="#2563eb" />
+                        <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 13 }}>Search Pre-added Diagnosis</Text>
+                    </TouchableOpacity>
+                )}
             </View>
             </LinearGradient>
 
             <LinearGradient colors={medicalPalette.medicines} style={{ borderRadius: 22, padding: 1.5, marginTop: 10, marginBottom: 25 }}>
             <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.16)' : '#bbf7d0' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center' }}>
-                        <Pill size={18} color="white" />
-                    </View>
-                    <View>
-                        <Text style={{ fontSize: 14, fontWeight: '900', color: theme.text, textTransform: 'uppercase', letterSpacing: 1 }}>Medicines (Rx)</Text>
-                        <Text style={{ fontSize: 12, color: theme.textDim }}>Prescription medicines and dosage plan</Text>
-                    </View>
-                </View>
-                <TouchableOpacity onPress={openMedModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.18)' : '#dcfce7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.28)' : '#86efac' }}>
-                    <PlusCircle size={16} color={theme.primary} />
-                    <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>Add Medicine</Text>
-                </TouchableOpacity>
-            </View>
+            {renderSectionHeader('Medicines (Rx)', 'Prescription medicines and dosage plan', Pill, '#10b981')}
 
-            <View style={{ gap: 12 }}>
+            <View style={{ gap: 12, marginBottom: 14 }}>
                 {editorForm.medicines.map((medicine, index) => (
                     <LinearGradient key={index} colors={theme.mode === 'dark' ? ['rgba(16,185,129,0.16)', 'rgba(14,165,233,0.06)'] : ['#f0fdf4', '#ecfeff']} style={{ borderRadius: 18, padding: 1.5 }}>
                     <View style={{ backgroundColor: medicalPalette.shell, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.9)', flexDirection: 'row', alignItems: 'center', gap: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2 }}>
-                        <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: '#0ea5e9', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ fontWeight: '900', color: 'white' }}>{index + 1}</Text>
-                        </View>
                         <View style={{ flex: 1 }}>
                             <Text style={{ fontWeight: 'bold', color: theme.text, fontSize: 16 }}>{medicine.name} <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textDim }}>{medicine.dosage ? `(${medicine.dosage})` : ''}</Text></Text>
                             {medicine.isTapering ? (
@@ -1002,50 +1250,47 @@ const TemplateScreen = ({
                                 </View>
                             )}
                         </View>
-                        <TouchableOpacity onPress={() => handleEditMedInTemplate(index)} style={{ padding: 8, backgroundColor: theme.inputBg, borderRadius: 10, marginRight: 5 }}>
-                            <Pencil size={18} color={theme.textDim} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => removeMedFromTemplate(index)} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 10 }}>
-                            <Trash2 size={18} color="#ef4444" />
-                        </TouchableOpacity>
+                        <View style={{ alignItems: 'center', gap: 6 }}>
+                            <TouchableOpacity onPress={() => handleEditMedInTemplate(index)} style={{ padding: 6, backgroundColor: theme.inputBg, borderRadius: 8 }}>
+                                <Pencil size={14} color={theme.textDim} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => removeMedFromTemplate(index)} style={{ padding: 6, backgroundColor: '#fee2e2', borderRadius: 8 }}>
+                                <Trash2 size={14} color="#ef4444" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                     </LinearGradient>
                 ))}
                 {editorForm.medicines.length === 0 && <View style={{ padding: 20, borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed', borderRadius: 16, alignItems: 'center', backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: '600' }}>No medicines added yet.</Text></View>}
             </View>
+            <TouchableOpacity onPress={openMedModal} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.18)' : '#dcfce7', paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.28)' : '#86efac' }}>
+                <PlusCircle size={18} color='#10b981' />
+                <Text style={{ color: '#10b981', fontWeight: 'bold', fontSize: 14 }}>Add Medicine</Text>
+            </TouchableOpacity>
             </View>
             </LinearGradient>
 
             <LinearGradient colors={medicalPalette.procedures} style={{ borderRadius: 22, padding: 1.5, marginBottom: 25 }}>
             <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(249,115,22,0.16)' : '#fdba74' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center' }}>
-                        <Settings size={18} color="white" />
-                    </View>
-                    <View>
-                        <Text style={{ fontSize: 14, fontWeight: '900', color: theme.text, textTransform: 'uppercase', letterSpacing: 1 }}>Procedures / Services</Text>
-                        <Text style={{ fontSize: 12, color: theme.textDim }}>Treatment procedures and estimated billing</Text>
-                    </View>
-                </View>
-                <TouchableOpacity onPress={openProcedureModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.mode === 'dark' ? 'rgba(249,115,22,0.18)' : '#ffedd5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(249,115,22,0.28)' : '#fdba74' }}>
-                    <PlusCircle size={16} color={theme.primary} />
-                    <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>Add Procedure</Text>
-                </TouchableOpacity>
-            </View>
+            {renderSectionHeader('Procedures / Services', 'Treatment procedures and estimated billing', Settings, '#f97316')}
 
-            <View style={{ gap: 12, marginBottom: 25 }}>
+            <View style={{ gap: 12, marginBottom: 14 }}>
                 {(editorForm.procedures || []).map((procedureItem, index) => (
                     <View key={index} style={{ backgroundColor: theme.cardBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2 }}>
                         <View>
                             <Text style={{ fontWeight: 'bold', color: theme.text, fontSize: 16 }}>{procedureItem.name}</Text>
                             <Text style={{ fontSize: 13, color: theme.textDim }}>Category: {procedureItem.category}</Text>
                         </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                             <Text style={{ fontWeight: 'bold', color: theme.primary, fontSize: 16 }}>₹{procedureItem.cost}</Text>
-                            <TouchableOpacity onPress={() => removeItemFromForm(index, 'procedure')} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 10 }}>
-                                <Trash2 size={18} color="#ef4444" />
-                            </TouchableOpacity>
+                            <View style={{ alignItems: 'center', gap: 6 }}>
+                                <TouchableOpacity onPress={() => openEditItemFromForm(index, 'procedure')} style={{ padding: 6, backgroundColor: theme.inputBg, borderRadius: 8 }}>
+                                    <Pencil size={14} color={theme.textDim} />
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => removeItemFromForm(index, 'procedure')} style={{ padding: 6, backgroundColor: '#fee2e2', borderRadius: 8 }}>
+                                    <Trash2 size={14} color="#ef4444" />
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                 ))}
@@ -1056,28 +1301,18 @@ const TemplateScreen = ({
                     </View>
                 )}
             </View>
+            <TouchableOpacity onPress={openProcedureModal} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.mode === 'dark' ? 'rgba(249,115,22,0.18)' : '#ffedd5', paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(249,115,22,0.28)' : '#fdba74' }}>
+                <PlusCircle size={18} color='#f97316' />
+                <Text style={{ color: '#f97316', fontWeight: 'bold', fontSize: 14 }}>Add Procedure</Text>
+            </TouchableOpacity>
             </View>
             </LinearGradient>
 
             <LinearGradient colors={medicalPalette.investigations} style={{ borderRadius: 22, padding: 1.5, marginBottom: 25 }}>
             <View style={{ backgroundColor: medicalPalette.shell, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(14,165,233,0.16)' : '#93c5fd' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#0284c7', alignItems: 'center', justifyContent: 'center' }}>
-                        <TestTube size={18} color="white" />
-                    </View>
-                    <View>
-                        <Text style={{ fontSize: 14, fontWeight: '900', color: theme.text, textTransform: 'uppercase', letterSpacing: 1 }}>Investigation On Next Visit</Text>
-                        <Text style={{ fontSize: 12, color: theme.textDim }}>Follow-up diagnostics and test planning</Text>
-                    </View>
-                </View>
-                <TouchableOpacity onPress={openInvestigationModal} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.mode === 'dark' ? 'rgba(14,165,233,0.18)' : '#e0f2fe', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(14,165,233,0.26)' : '#93c5fd' }}>
-                    <PlusCircle size={16} color={theme.primary} />
-                    <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 12 }}>Add Investigation</Text>
-                </TouchableOpacity>
-            </View>
+            {renderSectionHeader('Investigation On Next Visit', 'Follow-up diagnostics and test planning', TestTube, '#0284c7')}
 
-            <View style={{ gap: 12, marginBottom: 25 }}>
+            <View style={{ gap: 12, marginBottom: 14 }}>
                 {(editorForm.nextVisitInvestigations || []).map((item, index) => (
                     <View key={index} style={{ backgroundColor: theme.cardBg, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1089,13 +1324,22 @@ const TemplateScreen = ({
                                 <Text style={{ fontSize: 12, color: theme.textDim }}>Next Visit</Text>
                             </View>
                         </View>
-                        <TouchableOpacity onPress={() => removeItemFromForm(index, 'investigation')} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 10 }}>
-                            <Trash2 size={18} color="#ef4444" />
-                        </TouchableOpacity>
+                        <View style={{ alignItems: 'center', gap: 6 }}>
+                            <TouchableOpacity onPress={() => openEditItemFromForm(index, 'investigation')} style={{ padding: 6, backgroundColor: theme.inputBg, borderRadius: 8 }}>
+                                <Pencil size={14} color={theme.textDim} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => removeItemFromForm(index, 'investigation')} style={{ padding: 6, backgroundColor: '#fee2e2', borderRadius: 8 }}>
+                                <Trash2 size={14} color="#ef4444" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 ))}
                 {(editorForm.nextVisitInvestigations || []).length === 0 && <View style={{ padding: 20, borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed', borderRadius: 16, alignItems: 'center', backgroundColor: theme.inputBg }}><Text style={{ color: theme.textDim, fontWeight: '600' }}>No investigations added.</Text></View>}
             </View>
+            <TouchableOpacity onPress={openInvestigationModal} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: theme.mode === 'dark' ? 'rgba(14,165,233,0.18)' : '#e0f2fe', paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(14,165,233,0.26)' : '#93c5fd' }}>
+                <PlusCircle size={18} color='#0284c7' />
+                <Text style={{ color: '#0284c7', fontWeight: 'bold', fontSize: 14 }}>Add Investigation</Text>
+            </TouchableOpacity>
             </View>
             </LinearGradient>
 
@@ -1168,33 +1412,36 @@ const TemplateScreen = ({
             if (procViewMode === 'list') {
                 return (
                     <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
-                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{modalTitle}</Text>
-                            <TouchableOpacity onPress={() => setProcModalVisible(false)} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center', gap: 12 }}>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{modalTitle}</Text>
+                                <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>Select from your master list or add a custom entry.</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setProcModalVisible(false)} style={{ backgroundColor: modalTheme.cancelBg, padding: 8, borderRadius: 20 }}>
                                 <X size={20} color={theme.textDim} />
                             </TouchableOpacity>
                         </View>
 
-                        <View style={{ position: 'absolute', top: 0, right: 50 }}>
-                            <TouchableOpacity onPress={openAddMasterProc} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: theme.inputBg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12 }}>
+                            <TouchableOpacity onPress={openAddMasterProc} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: modalTheme.sectionBg, borderWidth: 1, borderColor: modalTheme.sectionBorder, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 }}>
                                 <PlusCircle size={16} color={theme.primary} />
                                 <Text style={{ color: theme.primary, fontSize: 12, fontWeight: 'bold' }}>New</Text>
                             </TouchableOpacity>
                         </View>
 
-                        <View style={{ marginBottom: 15 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: theme.border }}>
+                        <View style={{ marginBottom: 15, backgroundColor: modalTheme.sectionBg, borderRadius: 18, borderWidth: 1, borderColor: modalTheme.sectionBorder, padding: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f8fafc', borderRadius: 12, paddingHorizontal: 15, height: 50, borderWidth: 1, borderColor: theme.border }}>
                                 <Search size={20} color={theme.textDim} style={{ marginRight: 10 }} />
-                                <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} placeholder={procModalType === 'investigation' ? 'Search investigation...' : 'Search procedure...'} placeholderTextColor={theme.textDim} value={procSearch} onChangeText={setProcSearch} />
+                                <TextInput style={{ flex: 1, color: theme.text, fontSize: 15 }} placeholder={procModalType === 'investigation' ? 'Search investigation...' : 'Search procedure...'} placeholderTextColor={theme.textDim} value={procSearch} onChangeText={setProcSearch} />
                                 {procSearch.length > 0 && (
-                                    <TouchableOpacity onPress={() => setProcSearch('')}>
+                                    <TouchableOpacity onPress={() => setProcSearch('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                         <X size={18} color={theme.textDim} />
                                     </TouchableOpacity>
                                 )}
                             </View>
                         </View>
 
-                        <TouchableOpacity onPress={() => setShowCustomInput(!showCustomInput)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: showCustomInput ? theme.inputBg : theme.cardBg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border, marginBottom: 15 }}>
+                        <TouchableOpacity onPress={() => setShowCustomInput(!showCustomInput)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: modalTheme.sectionBg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: modalTheme.sectionBorder, marginBottom: 15 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                 <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#f5f3ff', alignItems: 'center', justifyContent: 'center' }}>
                                     <FlaskConical size={18} color="#8b5cf6" />
@@ -1205,24 +1452,28 @@ const TemplateScreen = ({
                         </TouchableOpacity>
 
                         {showCustomInput && (
-                            <View style={{ backgroundColor: theme.inputBg, padding: 15, borderRadius: 16, marginBottom: 15, gap: 10 }}>
+                            <View style={{ backgroundColor: modalTheme.sectionBg, borderWidth: 1, borderColor: modalTheme.sectionBorder, padding: 15, borderRadius: 16, marginBottom: 15, gap: 10 }}>
                                 <InputGroup icon={FileText} label="Name" value={customProcForm.name} onChange={(value) => setCustomProcForm({ ...customProcForm, name: value })} theme={theme} placeholder={procModalType === 'investigation' ? 'e.g. Thyroid Profile' : 'e.g. X-Ray Chest'} styles={styles} />
                                 <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
                                     <View style={{ flex: 1 }}>
                                         <InputGroup icon={Banknote} label="Price (Optional)" value={customProcForm.cost} onChange={(value) => setCustomProcForm({ ...customProcForm, cost: value })} theme={theme} placeholder="0" keyboardType="numeric" styles={styles} />
                                     </View>
-                                    <TouchableOpacity onPress={addCustomToRx} style={{ backgroundColor: theme.primary, height: 55, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-                                        <Text style={{ color: 'white', fontWeight: 'bold' }}>Add</Text>
+                                    <TouchableOpacity onPress={addCustomToRx} style={{ marginBottom: 4 }}>
+                                        <LinearGradient colors={modalTheme.primaryButton} style={{ height: 55, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Text style={{ color: 'white', fontWeight: 'bold' }}>Add</Text>
+                                        </LinearGradient>
                                     </TouchableOpacity>
                                 </View>
                             </View>
                         )}
 
                         <FlatList
+                            style={{ flex: 1 }}
                             data={procSearch.length > 0 ? procMatches : procedures}
                             keyExtractor={(item) => item.id.toString()}
                             contentContainerStyle={{ paddingBottom: 20 }}
                             showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
                             renderItem={({ item }) => {
                                 const catInfo = getCatInfo(item.category);
                                 const CategoryIcon = catInfo.icon;
@@ -1262,18 +1513,25 @@ const TemplateScreen = ({
 
             return (
                 <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
-                        <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{procViewMode === 'edit_master' ? 'Edit Item' : 'Add New Item'}</Text>
-                        <TouchableOpacity onPress={() => setProcViewMode('list')} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 20 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center', gap: 12 }}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>{procViewMode === 'edit_master' ? 'Edit Item' : 'Add New Item'}</Text>
+                            <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>Update your reusable procedure or investigation catalog.</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => setProcViewMode('list')} style={{ backgroundColor: modalTheme.cancelBg, padding: 8, borderRadius: 20 }}>
                             <ArrowLeft size={20} color={theme.textDim} />
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView showsVerticalScrollIndicator={false}>
+                    <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
                         <View style={{ gap: 15 }}>
-                            <InputGroup icon={Settings} label="Name *" value={masterProcForm.name} onChange={(value) => setMasterProcForm({ ...masterProcForm, name: value })} theme={theme} placeholder="Enter name" styles={styles} />
-                            <InputGroup icon={Banknote} label="Price (₹)" value={masterProcForm.cost} onChange={(value) => setMasterProcForm({ ...masterProcForm, cost: value })} theme={theme} placeholder="Enter price" keyboardType="numeric" styles={styles} />
-                            <View>
+                            <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 18, borderWidth: 1, borderColor: modalTheme.sectionBorder, padding: 16 }}>
+                                <InputGroup icon={Settings} label="Name *" value={masterProcForm.name} onChange={(value) => setMasterProcForm({ ...masterProcForm, name: value })} theme={theme} placeholder="Enter name" styles={styles} />
+                            </View>
+                            <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 18, borderWidth: 1, borderColor: modalTheme.sectionBorder, padding: 16 }}>
+                                <InputGroup icon={Banknote} label="Price (₹)" value={masterProcForm.cost} onChange={(value) => setMasterProcForm({ ...masterProcForm, cost: value })} theme={theme} placeholder="Enter price" keyboardType="numeric" styles={styles} />
+                            </View>
+                            <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 18, borderWidth: 1, borderColor: modalTheme.sectionBorder, padding: 16 }}>
                                 <Text style={{ color: theme.textDim, marginBottom: 8, fontWeight: '600' }}>Category</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
                                     {PROCEDURE_CATEGORIES.map((category) => {
@@ -1293,11 +1551,13 @@ const TemplateScreen = ({
                     </ScrollView>
 
                     <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-                        <TouchableOpacity onPress={() => setProcViewMode('list')} style={{ flex: 1, padding: 15, borderRadius: 12, alignItems: 'center', backgroundColor: theme.inputBg }}>
-                            <Text style={{ color: theme.textDim, fontWeight: 'bold' }}>Cancel</Text>
+                        <TouchableOpacity onPress={() => setProcViewMode('list')} style={{ flex: 1, padding: 15, borderRadius: 12, alignItems: 'center', backgroundColor: modalTheme.cancelBg, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
+                            <Text style={{ color: modalTheme.cancelText, fontWeight: 'bold' }}>Cancel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={handleSaveMasterProcedure} style={{ flex: 1, padding: 15, borderRadius: 12, alignItems: 'center', backgroundColor: theme.primary }}>
-                            <Text style={{ color: 'white', fontWeight: 'bold' }}>Save</Text>
+                        <TouchableOpacity onPress={handleSaveMasterProcedure} style={{ flex: 1 }}>
+                            <LinearGradient colors={modalTheme.primaryButton} style={{ padding: 15, borderRadius: 12, alignItems: 'center' }}>
+                                <Text style={{ color: 'white', fontWeight: 'bold' }}>Save</Text>
+                            </LinearGradient>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1310,7 +1570,7 @@ const TemplateScreen = ({
                     <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
                         <TouchableOpacity style={{ flex: 1 }} onPress={() => setProcModalVisible(false)} />
                         <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
-                        <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 31, borderTopRightRadius: 31, padding: 25, height: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.3, elevation: 20, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
+                        <View style={{ height: popupHeight, backgroundColor: modalTheme.surface, borderTopLeftRadius: 31, borderTopRightRadius: 31, paddingHorizontal: safeLayout.isTablet ? 25 : 18, paddingTop: 22, paddingBottom: safeLayout.isTablet ? 24 : 18, shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.3, elevation: 20, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
                             {renderModalContent()}
                         </View>
                         </LinearGradient>
@@ -1325,12 +1585,17 @@ const TemplateScreen = ({
             return null;
         }
 
+        const medicinesList = selectedTemplate.medicines || [];
+        const proceduresList = selectedTemplate.procedures || [];
+        const investigationsList = selectedTemplate.nextVisitInvestigations || [];
+
         return (
             <Modal visible={viewModalVisible} transparent animationType="fade" onRequestClose={() => setViewModalVisible(false)}>
-                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', padding: 18 }}>
+                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', alignItems: 'center', padding: 18 }}>
                     <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setViewModalVisible(false)} />
-                    <View style={{ backgroundColor: theme.mode === 'dark' ? '#0f172a' : '#f1f5f9', borderRadius: 22, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.22, elevation: 10, maxHeight: '84%', borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(148,163,184,0.16)' : '#dbeafe' }}>
-                        <View style={{ padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.mode === 'dark' ? '#0f766e' : '#0ea5e9' }}>
+                    <LinearGradient colors={modalTheme.shellColors} style={{ width: '100%', maxWidth: safeLayout.isTablet ? 720 : undefined, height: popupHeight, borderRadius: 26, padding: 1.5, overflow: 'hidden' }}>
+                    <View style={{ flex: 1, backgroundColor: modalTheme.surface, borderRadius: 25, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.22, elevation: 10, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
+                        <LinearGradient colors={modalTheme.headerColors} style={{ padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 10 }}>
                                 <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
                                     <FileText size={20} color="white" />
@@ -1343,10 +1608,15 @@ const TemplateScreen = ({
                             <TouchableOpacity onPress={() => setViewModalVisible(false)} style={{ backgroundColor: modalTheme.closeBg, padding: 6, borderRadius: 16 }}>
                                 <X size={18} color="white" />
                             </TouchableOpacity>
-                        </View>
-                        <ScrollView style={{ backgroundColor: 'transparent' }} contentContainerStyle={{ padding: 16, paddingBottom: 18 }} showsVerticalScrollIndicator={false}>
+                        </LinearGradient>
+                        <ScrollView
+                            style={{ flex: 1, backgroundColor: 'transparent' }}
+                            contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
+                            showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled
+                        >
                             <LinearGradient colors={theme.mode === 'dark' ? ['rgba(16,185,129,0.16)', 'rgba(14,165,233,0.08)'] : ['#ecfdf5', '#eff6ff']} style={{ borderRadius: 16, padding: 1.5 }}>
-                                <View style={{ backgroundColor: theme.mode === 'dark' ? '#111827' : '#ffffff', borderRadius: 15, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(16,185,129,0.18)' : '#d1fae5' }}>
+                                <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 15, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                         <FileText size={16} color={theme.primary} />
                                         <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Template Name</Text>
@@ -1356,7 +1626,7 @@ const TemplateScreen = ({
                             </LinearGradient>
 
                             <LinearGradient colors={theme.mode === 'dark' ? ['rgba(59,130,246,0.14)', 'rgba(14,165,233,0.08)'] : ['#eff6ff', '#ecfeff']} style={{ borderRadius: 16, padding: 1.5, marginTop: 14 }}>
-                                <View style={{ backgroundColor: theme.mode === 'dark' ? '#111827' : '#ffffff', borderRadius: 15, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.18)' : '#bfdbfe' }}>
+                                <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 15, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                         <Stethoscope size={16} color="#2563eb" />
                                         <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Diagnosis</Text>
@@ -1366,16 +1636,95 @@ const TemplateScreen = ({
                             </LinearGradient>
 
                             <LinearGradient colors={theme.mode === 'dark' ? ['rgba(251,146,60,0.14)', 'rgba(244,63,94,0.08)'] : ['#fff7ed', '#fff1f2']} style={{ borderRadius: 16, padding: 1.5, marginTop: 14 }}>
-                                <View style={{ backgroundColor: theme.mode === 'dark' ? '#111827' : '#ffffff', borderRadius: 15, padding: 16, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(251,146,60,0.18)' : '#fed7aa' }}>
+                                <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 15, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                         <Clipboard size={16} color="#c2410c" />
-                                        <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Note</Text>
+                                        <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Advice</Text>
                                     </View>
                                     <Text style={{ color: theme.textDim, fontSize: 14, lineHeight: 20 }}>{selectedTemplate.advice || 'No specific advice.'}</Text>
                                 </View>
                             </LinearGradient>
+
+                            <LinearGradient colors={theme.mode === 'dark' ? ['rgba(139,92,246,0.16)', 'rgba(124,58,237,0.08)'] : ['#f5f3ff', '#faf5ff']} style={{ borderRadius: 16, padding: 1.5, marginTop: 14 }}>
+                                <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 15, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                        <UserPlus size={16} color="#7c3aed" />
+                                        <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Referral</Text>
+                                    </View>
+                                    <Text style={{ color: theme.textDim, fontSize: 14, lineHeight: 20 }}>{selectedTemplate.referral || 'No referral added.'}</Text>
+                                </View>
+                            </LinearGradient>
+
+                            <LinearGradient colors={theme.mode === 'dark' ? ['rgba(16,185,129,0.16)', 'rgba(45,212,191,0.08)'] : ['#ecfdf5', '#f0fdf4']} style={{ borderRadius: 16, padding: 1.5, marginTop: 14 }}>
+                                <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 15, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Pill size={16} color="#059669" />
+                                            <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Medicines</Text>
+                                        </View>
+                                        <Text style={{ color: '#059669', fontSize: 12, fontWeight: '800' }}>{medicinesList.length} items</Text>
+                                    </View>
+                                    {medicinesList.length > 0 ? medicinesList.map((medicine, index) => (
+                                        <View key={`${medicine.id || medicine.name || 'med'}-${index}`} style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: modalTheme.sectionBorder, marginTop: index === 0 ? 0 : 8 }}>
+                                            <Text style={{ color: theme.text, fontSize: 13, fontWeight: '700' }}>{medicine.name || 'Unnamed medicine'}</Text>
+                                            <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 3 }}>
+                                                {[medicine.type, medicine.content, medicine.doseQty, medicine.freq, medicine.duration, medicine.instruction]
+                                                    .filter(Boolean)
+                                                    .join(' | ') || 'No additional medicine details'}
+                                            </Text>
+                                        </View>
+                                    )) : (
+                                        <Text style={{ color: theme.textDim, fontSize: 13 }}>No medicines added.</Text>
+                                    )}
+                                </View>
+                            </LinearGradient>
+
+                            <LinearGradient colors={theme.mode === 'dark' ? ['rgba(249,115,22,0.16)', 'rgba(234,88,12,0.08)'] : ['#fff7ed', '#fffbeb']} style={{ borderRadius: 16, padding: 1.5, marginTop: 14 }}>
+                                <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 15, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Settings size={16} color="#ea580c" />
+                                            <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Procedures</Text>
+                                        </View>
+                                        <Text style={{ color: '#ea580c', fontSize: 12, fontWeight: '800' }}>{proceduresList.length} items</Text>
+                                    </View>
+                                    {proceduresList.length > 0 ? proceduresList.map((procedure, index) => (
+                                        <View key={`${procedure.id || procedure.name || 'proc'}-${index}`} style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: modalTheme.sectionBorder, marginTop: index === 0 ? 0 : 8 }}>
+                                            <Text style={{ color: theme.text, fontSize: 13, fontWeight: '700' }}>{procedure.name || 'Unnamed procedure'}</Text>
+                                            <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 3 }}>
+                                                {[procedure.category, procedure.cost ? `Rs ${procedure.cost}` : null].filter(Boolean).join(' | ') || 'No additional procedure details'}
+                                            </Text>
+                                        </View>
+                                    )) : (
+                                        <Text style={{ color: theme.textDim, fontSize: 13 }}>No procedures added.</Text>
+                                    )}
+                                </View>
+                            </LinearGradient>
+
+                            <LinearGradient colors={theme.mode === 'dark' ? ['rgba(14,165,233,0.16)', 'rgba(59,130,246,0.08)'] : ['#eff6ff', '#ecfeff']} style={{ borderRadius: 16, padding: 1.5, marginTop: 14 }}>
+                                <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 15, padding: 16, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <FlaskConical size={16} color="#0284c7" />
+                                            <Text style={{ fontSize: 12, color: theme.textDim, textTransform: 'uppercase', fontWeight: '700' }}>Investigations</Text>
+                                        </View>
+                                        <Text style={{ color: '#0284c7', fontSize: 12, fontWeight: '800' }}>{investigationsList.length} items</Text>
+                                    </View>
+                                    {investigationsList.length > 0 ? investigationsList.map((investigation, index) => (
+                                        <View key={`${investigation.id || investigation.name || 'inv'}-${index}`} style={{ backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: modalTheme.sectionBorder, marginTop: index === 0 ? 0 : 8 }}>
+                                            <Text style={{ color: theme.text, fontSize: 13, fontWeight: '700' }}>{investigation.name || 'Unnamed investigation'}</Text>
+                                            <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 3 }}>
+                                                {[investigation.category, investigation.cost ? `Rs ${investigation.cost}` : null].filter(Boolean).join(' | ') || 'No additional investigation details'}
+                                            </Text>
+                                        </View>
+                                    )) : (
+                                        <Text style={{ color: theme.textDim, fontSize: 13 }}>No investigations added.</Text>
+                                    )}
+                                </View>
+                            </LinearGradient>
                         </ScrollView>
                     </View>
+                    </LinearGradient>
                 </View>
             </Modal>
         );
@@ -1393,10 +1742,11 @@ const TemplateScreen = ({
 
         return (
         <Modal visible={showTemplatePicker} transparent animationType="slide" onRequestClose={() => setShowTemplatePicker(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
                 <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowTemplatePicker(false)} />
                 <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
-                <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 27, borderTopRightRadius: 27, maxHeight: height * 0.78, paddingBottom: 30, borderWidth: 1, borderColor: modalTheme.shellBorder, overflow: 'hidden' }}>
+                <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 27, borderTopRightRadius: 27, height: popupHeight, borderWidth: 1, borderColor: modalTheme.shellBorder, overflow: 'hidden' }}>
                     <LinearGradient colors={modalTheme.headerColors} style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View>
                             <Text style={{ fontSize: 11, fontWeight: '800', color: modalTheme.eyebrowText, letterSpacing: 0.7 }}>TEMPLATE LIBRARY</Text>
@@ -1408,7 +1758,7 @@ const TemplateScreen = ({
                     </LinearGradient>
 
                     <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: modalTheme.infoBg, borderRadius: 12, paddingHorizontal: 10, height: 45, borderWidth: 1, borderColor: modalTheme.infoBorder }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f8fafc', borderRadius: 12, paddingHorizontal: 10, height: 45, borderWidth: 1, borderColor: theme.border }}>
                             <Search size={18} color={theme.textDim} style={{ marginRight: 8 }} />
                             <TextInput style={{ flex: 1, color: theme.text }} placeholder="Search templates..." placeholderTextColor={theme.textDim} value={templatePickerSearch} onChangeText={setTemplatePickerSearch} />
                             {templatePickerSearch.length > 0 && (
@@ -1420,63 +1770,296 @@ const TemplateScreen = ({
                     </View>
 
                     <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
-                        <View style={{ backgroundColor: modalTheme.infoBg, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: modalTheme.infoBorder, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: modalTheme.sectionBorder, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>Templates ready to use</Text>
                             <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '800' }}>{pickerFilteredTemplates.length} found</Text>
                         </View>
                     </View>
 
-                    {pickerFilteredTemplates.length > 0 ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 10 }}>
-                            <LinearGradient colors={tableTheme.shellColors} style={{ minWidth: tableMinWidth - 80, flex: 1, borderRadius: 22, padding: 1.5 }}>
-                                <View style={{ borderRadius: 21, overflow: 'hidden', borderWidth: 1, borderColor: tableTheme.outline, backgroundColor: tableTheme.statBg }}>
-                                    <LinearGradient colors={tableTheme.headerColors} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 }}>
-                                        <Text style={{ width: 220, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Template</Text>
-                                        <Text style={{ width: 230, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Diagnosis</Text>
-                                        <Text style={{ width: 150, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Items</Text>
-                                        <Text style={{ flex: 1, minWidth: 170, color: tableTheme.headerText, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Action</Text>
-                                    </LinearGradient>
+                    <View style={{ flex: 1, paddingHorizontal: 20, paddingBottom: 12 }}>
+                        {pickerFilteredTemplates.length > 0 ? (
+                            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 6 }} keyboardShouldPersistTaps="handled">
+                                {pickerFilteredTemplates.map((item) => {
+                                    const summary = [
+                                        `${(item.medicines || []).length} med`,
+                                        `${(item.procedures || []).length} proc`,
+                                        `${(item.nextVisitInvestigations || []).length} inv`
+                                    ].join(' • ');
 
-                                    {pickerFilteredTemplates.map((item, index) => {
-                                        const isLastRow = index === pickerFilteredTemplates.length - 1;
-                                        const summary = [
-                                            `${(item.medicines || []).length} med`,
-                                            `${(item.procedures || []).length} proc`,
-                                            `${(item.nextVisitInvestigations || []).length} inv`
-                                        ].join(' • ');
-
-                                        return (
-                                            <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: index % 2 === 0 ? tableTheme.rowEven : tableTheme.rowOdd, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: isLastRow ? 0 : 1, borderBottomColor: tableTheme.rowBorder }}>
-                                                <View style={{ width: 220, paddingRight: 12 }}>
-                                                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }} numberOfLines={1}>{item.name || 'Untitled Template'}</Text>
-                                                </View>
-                                                <View style={{ width: 230, paddingRight: 12 }}>
-                                                    <Text style={{ fontSize: 13, color: theme.textDim, fontWeight: '600' }} numberOfLines={2}>{item.diagnosis || 'Not specified'}</Text>
-                                                </View>
-                                                <View style={{ width: 150, paddingRight: 12 }}>
-                                                    <Text style={{ fontSize: 13, color: theme.text, fontWeight: '600' }} numberOfLines={2}>{summary}</Text>
-                                                </View>
-                                                <View style={{ flex: 1, minWidth: 170, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-                                                    <TouchableOpacity onPress={() => applyTemplate(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tableTheme.editActionBg, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 }}>
-                                                        <Copy size={16} color={tableTheme.editActionText} />
-                                                        <Text style={{ color: tableTheme.editActionText, fontSize: 12, fontWeight: '700' }}>Use</Text>
-                                                    </TouchableOpacity>
-                                                </View>
+                                    return (
+                                        <View key={item.id} style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
+                                            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }} numberOfLines={1}>{item.name || 'Untitled Template'}</Text>
+                                            <Text style={{ fontSize: 12, color: theme.textDim, marginTop: 5 }} numberOfLines={2}>{item.diagnosis || 'Not specified'}</Text>
+                                            <Text style={{ fontSize: 12, color: theme.text, fontWeight: '600', marginTop: 8 }}>{summary}</Text>
+                                            <View style={{ alignItems: 'flex-end', marginTop: 10 }}>
+                                                <TouchableOpacity onPress={() => applyTemplate(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tableTheme.editActionBg, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 }}>
+                                                    <Copy size={16} color={tableTheme.editActionText} />
+                                                    <Text style={{ color: tableTheme.editActionText, fontSize: 12, fontWeight: '700' }}>Use</Text>
+                                                </TouchableOpacity>
                                             </View>
-                                        );
-                                    })}
-                                </View>
-                            </LinearGradient>
-                        </ScrollView>
-                    ) : (
-                        <Text style={{ textAlign: 'center', padding: 20, color: theme.textDim }}>No templates available.</Text>
-                    )}
+                                        </View>
+                                    );
+                                })}
+                            </ScrollView>
+                        ) : (
+                            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
+                                <FileText size={42} color={theme.textDim} />
+                                <Text style={{ textAlign: 'center', paddingTop: 12, color: theme.textDim }}>No templates available.</Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
                 </LinearGradient>
             </View>
+            </KeyboardAvoidingView>
         </Modal>
         );
     };
+
+    const DiagnosisPickerModal = () => (
+        <Modal visible={diagnosisPickerVisible} transparent animationType="slide" onRequestClose={() => setDiagnosisPickerVisible(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
+                    <TouchableOpacity style={{ flex: 1 }} onPress={() => setDiagnosisPickerVisible(false)} />
+                    <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
+                        <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 27, borderTopRightRadius: 27, maxHeight: popupHeight, borderWidth: 1, borderColor: modalTheme.shellBorder, overflow: 'hidden' }}>
+                            <LinearGradient colors={modalTheme.headerColors} style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <View>
+                                    <Text style={{ fontSize: 11, fontWeight: '800', color: modalTheme.eyebrowText, letterSpacing: 0.7 }}>DIAGNOSIS LIBRARY</Text>
+                                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: modalTheme.headerText, marginTop: 4 }}>Select Diagnosis</Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setDiagnosisPickerVisible(false);
+                                        setDiagnosisPickerSearch('');
+                                    }}
+                                    style={{ backgroundColor: modalTheme.closeBg, padding: 8, borderRadius: 20 }}
+                                >
+                                    <X size={22} color={modalTheme.closeIcon} />
+                                </TouchableOpacity>
+                            </LinearGradient>
+
+                            <View style={{ paddingHorizontal: 20, paddingVertical: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f8fafc', borderRadius: 12, paddingHorizontal: 10, height: 45, borderWidth: 1, borderColor: theme.border }}>
+                                    <Search size={18} color={theme.textDim} style={{ marginRight: 8 }} />
+                                    <TextInput
+                                        style={{ flex: 1, color: theme.text }}
+                                        placeholder="Search diagnosis..."
+                                        placeholderTextColor={theme.textDim}
+                                        value={diagnosisPickerSearch}
+                                        onChangeText={setDiagnosisPickerSearch}
+                                    />
+                                    {diagnosisPickerSearch.length > 0 && (
+                                        <TouchableOpacity onPress={() => setDiagnosisPickerSearch('')}>
+                                            <X size={16} color={theme.textDim} />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        handleAddDiagnosisToList(diagnosisPickerSearch);
+                                        setDiagnosisPickerSearch('');
+                                    }}
+                                    style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: theme.mode === 'dark' ? 'rgba(37,99,235,0.16)' : '#dbeafe', borderRadius: 10, paddingVertical: 9, borderWidth: 1, borderColor: theme.mode === 'dark' ? 'rgba(59,130,246,0.24)' : '#93c5fd' }}
+                                >
+                                    <PlusCircle size={15} color="#2563eb" />
+                                    <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 12 }}>Add Search Text To List</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
+                                <View style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: modalTheme.sectionBorder, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={{ color: theme.textDim, fontSize: 12, fontWeight: '700' }}>Available diagnoses</Text>
+                                    <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '800' }}>{filteredDiagnosisItems.length} found</Text>
+                                </View>
+                            </View>
+
+                            <View style={{ paddingHorizontal: 20, paddingBottom: 18 }}>
+                                {filteredDiagnosisItems.length > 0 ? (
+                                    <ScrollView style={{ maxHeight: safeLayout.isTablet ? 420 : 300 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                                        <View style={{ gap: 10 }}>
+                                            {filteredDiagnosisItems.map((diagnosisItem, index) => (
+                                                <View
+                                                    key={`${diagnosisItem.name}-${index}`}
+                                                    style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: modalTheme.sectionBorder }}
+                                                >
+                                                    {editingDiagnosis && editingDiagnosis.toLowerCase() === diagnosisItem.name.toLowerCase() ? (
+                                                        <>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 10, paddingHorizontal: 10, height: 42, borderWidth: 1, borderColor: theme.border }}>
+                                                                <TextInput
+                                                                    style={{ flex: 1, color: theme.text }}
+                                                                    value={editingDiagnosisText}
+                                                                    onChangeText={setEditingDiagnosisText}
+                                                                    autoFocus
+                                                                    placeholder="Edit diagnosis..."
+                                                                    placeholderTextColor={theme.textDim}
+                                                                />
+                                                            </View>
+                                                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+                                                                <TouchableOpacity
+                                                                    onPress={() => {
+                                                                        setEditingDiagnosis(null);
+                                                                        setEditingDiagnosisText('');
+                                                                        setEditingDiagnosisIsCustom(false);
+                                                                    }}
+                                                                    style={{ backgroundColor: modalTheme.cancelBg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: modalTheme.sectionBorder }}
+                                                                >
+                                                                    <Text style={{ color: modalTheme.cancelText, fontWeight: '700', fontSize: 12 }}>Cancel</Text>
+                                                                </TouchableOpacity>
+                                                                <TouchableOpacity onPress={handleSaveEditedDiagnosis} style={{ backgroundColor: '#dbeafe', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#93c5fd' }}>
+                                                                    <Text style={{ color: '#1d4ed8', fontWeight: '700', fontSize: 12 }}>Save</Text>
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        </>
+                                                    ) : (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                                                            <TouchableOpacity
+                                                                onPress={() => {
+                                                                    setEditorForm((prev) => ({ ...prev, diagnosis: diagnosisItem.name }));
+                                                                    setDiagnosisPickerVisible(false);
+                                                                    setDiagnosisPickerSearch('');
+                                                                }}
+                                                                style={{ flex: 1 }}
+                                                            >
+                                                                <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>{diagnosisItem.name}</Text>
+                                                                <Text style={{ marginTop: 4, color: theme.textDim, fontSize: 11 }}>{diagnosisItem.isCustom ? 'Custom diagnosis' : diagnosisItem.isTemplate ? 'From saved templates' : 'Diagnosis item'}</Text>
+                                                            </TouchableOpacity>
+                                                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                                                                <TouchableOpacity onPress={() => handleStartEditDiagnosis(diagnosisItem.name, diagnosisItem.isCustom)} style={{ backgroundColor: theme.inputBg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: theme.border }}>
+                                                                    <Pencil size={14} color={theme.textDim} />
+                                                                </TouchableOpacity>
+                                                                <TouchableOpacity onPress={() => handleDeleteDiagnosisFromList(diagnosisItem.name, diagnosisItem.isCustom)} style={{ backgroundColor: '#fee2e2', padding: 8, borderRadius: 8 }}>
+                                                                    <Trash2 size={14} color="#ef4444" />
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </ScrollView>
+                                ) : (
+                                    <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 26, opacity: 0.6 }}>
+                                        <Stethoscope size={34} color={theme.textDim} />
+                                        <Text style={{ textAlign: 'center', color: theme.textDim, marginTop: 8 }}>No matching diagnosis found.</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    </LinearGradient>
+                </View>
+            </KeyboardAvoidingView>
+        </Modal>
+    );
+
+    const PatientPickerModal = () => (
+        <Modal visible={patientPickerVisible} transparent animationType="slide" onRequestClose={() => setPatientPickerVisible(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'flex-end' }}>
+                    <TouchableOpacity style={{ flex: 1 }} onPress={() => setPatientPickerVisible(false)} />
+                    <LinearGradient colors={modalTheme.shellColors} style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 1.5, paddingHorizontal: 1.5 }}>
+                        <View style={{ backgroundColor: modalTheme.surface, borderTopLeftRadius: 27, borderTopRightRadius: 27, maxHeight: popupHeight, borderWidth: 1, borderColor: modalTheme.shellBorder, overflow: 'hidden' }}>
+                            <LinearGradient colors={modalTheme.headerColors} style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <View>
+                                    <Text style={{ fontSize: 11, fontWeight: '800', color: modalTheme.eyebrowText, letterSpacing: 0.7 }}>PATIENT LIST</Text>
+                                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: modalTheme.headerText, marginTop: 4 }}>Select Patient</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setPatientPickerVisible(false)} style={{ backgroundColor: modalTheme.closeBg, padding: 8, borderRadius: 20 }}>
+                                    <X size={22} color={modalTheme.closeIcon} />
+                                </TouchableOpacity>
+                            </LinearGradient>
+
+                            <View style={{ paddingHorizontal: 20, paddingVertical: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f8fafc', borderRadius: 12, paddingHorizontal: 10, height: 45, borderWidth: 1, borderColor: theme.border }}>
+                                    <Search size={18} color={theme.textDim} style={{ marginRight: 8 }} />
+                                    <TextInput
+                                        style={{ flex: 1, color: theme.text }}
+                                        placeholder="Search patient name / mobile / ID"
+                                        placeholderTextColor={theme.textDim}
+                                        value={patientPickerSearch}
+                                        onChangeText={setPatientPickerSearch}
+                                    />
+                                    {patientPickerSearch.length > 0 && (
+                                        <TouchableOpacity onPress={() => setPatientPickerSearch('')}>
+                                            <X size={16} color={theme.textDim} />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+
+                            <View style={{ paddingHorizontal: 20, paddingBottom: 18 }}>
+                                {filteredPatientOptions.length > 0 ? (
+                                    <ScrollView style={{ maxHeight: safeLayout.isTablet ? 420 : 320 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                                        <View style={{ gap: 10 }}>
+                                            {filteredPatientOptions.map((patientItem) => (
+                                                <TouchableOpacity
+                                                    key={`rx-patient-${patientItem.id}`}
+                                                    onPress={() => {
+                                                        if (typeof onSelectPrescriptionPatient === 'function') {
+                                                            onSelectPrescriptionPatient(patientItem.id);
+                                                        }
+                                                        setPatientPickerVisible(false);
+                                                        setPatientPickerSearch('');
+                                                    }}
+                                                    style={{ backgroundColor: modalTheme.sectionBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: modalTheme.sectionBorder }}
+                                                >
+                                                    <Text style={{ color: theme.text, fontSize: 14, fontWeight: '700' }}>{patientItem.name}</Text>
+                                                    <Text style={{ color: theme.textDim, fontSize: 12, marginTop: 4 }}>ID: #{patientItem.id} • {patientItem.mobile || 'No mobile'}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </ScrollView>
+                                ) : (
+                                    <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 26, opacity: 0.6 }}>
+                                        <UserPlus size={34} color={theme.textDim} />
+                                        <Text style={{ textAlign: 'center', color: theme.textDim, marginTop: 8 }}>No matching patients found.</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    </LinearGradient>
+                </View>
+            </KeyboardAvoidingView>
+        </Modal>
+    );
+
+    const EditTemplateItemModal = () => (
+        <Modal visible={editTemplateItemVisible} transparent animationType="fade" onRequestClose={() => setEditTemplateItemVisible(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setEditTemplateItemVisible(false)} />
+                    <LinearGradient colors={modalTheme.shellColors} style={{ width: '100%', maxWidth: 360, borderRadius: 22, padding: 1.5 }}>
+                        <View style={{ backgroundColor: modalTheme.surface, borderRadius: 21, padding: 16, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
+                            <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800', marginBottom: 12 }}>{editTemplateItemType === 'investigation' ? 'Edit Investigation' : 'Edit Procedure'}</Text>
+                            <View style={{ gap: 10 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 10, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 10, height: 44 }}>
+                                    <TextInput style={{ flex: 1, color: theme.text }} value={editTemplateItemForm.name} onChangeText={(value) => setEditTemplateItemForm((prev) => ({ ...prev, name: value }))} placeholder="Name" placeholderTextColor={theme.textDim} />
+                                </View>
+                                <View style={{ flexDirection: 'row', gap: 8 }}>
+                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 10, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 10, height: 44 }}>
+                                        <TextInput style={{ flex: 1, color: theme.text }} value={editTemplateItemForm.cost} onChangeText={(value) => setEditTemplateItemForm((prev) => ({ ...prev, cost: value }))} placeholder="Cost" keyboardType="numeric" placeholderTextColor={theme.textDim} />
+                                    </View>
+                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 10, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 10, height: 44 }}>
+                                        <TextInput style={{ flex: 1, color: theme.text }} value={editTemplateItemForm.category} onChangeText={(value) => setEditTemplateItemForm((prev) => ({ ...prev, category: value }))} placeholder="Category" placeholderTextColor={theme.textDim} />
+                                    </View>
+                                </View>
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                                <TouchableOpacity onPress={() => setEditTemplateItemVisible(false)} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: modalTheme.cancelBg, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
+                                    <Text style={{ color: modalTheme.cancelText, fontWeight: '700' }}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={saveEditedItemInForm} style={{ flex: 1 }}>
+                                    <LinearGradient colors={modalTheme.primaryButton} style={{ alignItems: 'center', paddingVertical: 10, borderRadius: 10 }}>
+                                        <Text style={{ color: 'white', fontWeight: '700' }}>Save</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </LinearGradient>
+                </View>
+            </KeyboardAvoidingView>
+        </Modal>
+    );
 
     return (
         <View style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -1536,10 +2119,15 @@ const TemplateScreen = ({
             {renderProcedureModal()}
             {TemplateDetailPopup()}
             {TemplatePickerModal()}
+            {DiagnosisPickerModal()}
+            {PatientPickerModal()}
+            {EditTemplateItemModal()}
             <CustomPicker visible={rowLimitPickerVisible} title="Rows to show" data={rowLimitOptions} onClose={() => setRowLimitPickerVisible(false)} onSelect={(value) => setRowLimit(Number(value))} theme={theme} />
 
-            <Modal visible={inputVisible} transparent animationType="fade">
+            <Modal visible={inputVisible} transparent animationType="fade" onRequestClose={() => setInputVisible(false)}>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <View style={{ flex: 1, backgroundColor: modalTheme.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setInputVisible(false)} />
                     <LinearGradient colors={modalTheme.shellColors} style={{ width: '100%', maxWidth: 300, borderRadius: 22, padding: 1.5 }}>
                     <View style={{ width: '100%', backgroundColor: modalTheme.surface, borderRadius: 21, padding: 20, borderWidth: 1, borderColor: modalTheme.shellBorder }}>
                         <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 15 }}>{editingItem ? 'Edit Item' : 'Add New Item'}</Text>
@@ -1547,11 +2135,11 @@ const TemplateScreen = ({
                             <TextInput style={{ flex: 1, color: theme.text, fontSize: 16 }} value={inputText} onChangeText={setInputText} autoFocus placeholder="Type custom value..." placeholderTextColor={theme.textDim} />
                         </View>
                         <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-                            <TouchableOpacity onPress={() => setInputVisible(false)} style={{ flex: 1, padding: 12, alignItems: 'center', borderRadius: 10, backgroundColor: modalTheme.cancelBg }}>
+                            <TouchableOpacity onPress={() => setInputVisible(false)} style={{ flex: 1, padding: 12, alignItems: 'center', borderRadius: 10, backgroundColor: modalTheme.cancelBg, borderWidth: 1, borderColor: modalTheme.sectionBorder }}>
                                 <Text style={{ color: modalTheme.cancelText, fontWeight: 'bold' }}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={handleAddItem} style={{ flex: 1 }}>
-                                <LinearGradient colors={modalTheme.primaryButton} style={{ padding: 12, alignItems: 'center', borderRadius: 10 }}>
+                                <LinearGradient colors={modalTheme.primaryButton} style={{ padding: 12, alignItems: 'center', borderRadius: 10, shadowColor: theme.primary, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}>
                                     <Text style={{ color: 'white', fontWeight: 'bold' }}>{editingItem ? 'Update' : 'Add'}</Text>
                                 </LinearGradient>
                             </TouchableOpacity>
@@ -1559,6 +2147,7 @@ const TemplateScreen = ({
                     </View>
                     </LinearGradient>
                 </View>
+                </KeyboardAvoidingView>
             </Modal>
         </View>
     );
